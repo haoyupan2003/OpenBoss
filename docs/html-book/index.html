@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>《Claude Code 源码学习》HTML 版</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="assets/style.css" />
+    <script src="assets/mermaid.min.js"></script>
+    <script src="assets/book.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar"><a class="book-home" href="index.html">目录</a><ul><li><a href="ch01.html">一次请求的完整旅程</a></li>
+<li><a href="ch02.html">架构分层与模块划分</a></li>
+<li><a href="ch03.html">核心设计原则</a></li>
+<li><a href="ch04.html">技术选型与权衡</a></li>
+<li><a href="ch05.html">Agentic Loop——Agent 的心脏</a></li>
+<li><a href="ch06.html">流式响应架构</a></li>
+<li><a href="ch07.html">工具调度与并发执行</a></li>
+<li><a href="ch08.html">Plan Mode——思考与行动的分离</a></li>
+<li><a href="ch09.html">QueryEngine——查询编排器</a></li>
+<li><a href="ch10.html">上下文窗口——Agent 最稀缺的资源</a></li>
+<li><a href="ch11.html">上下文组装——给 Agent 看什么</a></li>
+<li><a href="ch12.html">上下文压缩与摘要（Compact）</a></li>
+<li><a href="ch13.html">跨会话记忆（SessionMemory）</a></li>
+<li><a href="ch14.html">工具架构——统一接口与注册表</a></li>
+<li><a href="ch15.html">文件操作工具的设计哲学</a></li>
+<li><a href="ch16.html">Shell 执行——Agent 最危险的工具</a></li>
+<li><a href="ch17.html">搜索工具——让 Agent 找到信息</a></li>
+<li><a href="ch18.html">子 Agent 调度——AgentTool 与任务委派</a></li>
+<li><a href="ch19.html">MCP——开放的工具协议</a></li>
+<li><a href="ch20.html">权限模型——信任与控制</a></li>
+<li><a href="ch21.html">权限的运行时执行</a></li>
+<li><a href="ch22.html">沙箱——Agent 的活动围栏</a></li>
+<li><a href="ch23.html">安全设计总结——纵深防御</a></li>
+<li><a href="ch24.html">Swarm——多 Agent 协调架构</a></li>
+<li><a href="ch25.html">Worktree——并行工作流</a></li>
+<li><a href="ch26.html">Teleport——远程协作</a></li>
+<li><a href="ch27.html">后台任务与异步执行</a></li>
+<li><a href="ch28.html">全局状态设计</a></li>
+<li><a href="ch29.html">状态变更与响应式更新</a></li>
+<li><a href="ch30.html">对话历史的持久化与恢复</a></li>
+<li><a href="ch31.html">React 在终端——Ink 框架的设计</a></li>
+<li><a href="ch32.html">消息渲染——从 AI 输出到终端显示</a></li>
+<li><a href="ch33.html">输入系统——用户如何与 Agent 交互</a></li>
+<li><a href="ch34.html">虚拟滚动与渲染性能</a></li>
+<li><a href="ch35.html">命令系统——可插拔的命令架构</a></li>
+<li><a href="ch36.html">插件系统——第三方扩展机制</a></li>
+<li><a href="ch37.html">技能系统（Skills）</a></li>
+<li><a href="ch38.html">Feature Flag 与渐进式发布</a></li>
+<li><a href="ch39.html">错误处理与重试策略</a></li>
+<li><a href="ch40.html">成本控制与速率限制</a></li>
+<li><a href="ch41.html">OAuth 与认证架构</a></li>
+<li><a href="ch42.html">可观测性——日志、遥测与诊断</a></li>
+<li><a href="ch43.html">启动流程——从命令行到 Agent 就绪</a></li>
+<li><a href="ch44.html">应用状态机——从引导到就绪</a></li>
+<li><a href="ch45.html">架构模式总结与启示</a></li></ul></nav>
+      <main class="content content-index">
+        <article class="article">
+          <h1 id="claude-code-源码学习如何设计一个强大的-ai-agent">《Claude Code 源码学习：如何设计一个强大的 AI Agent》</h1>
+<h2 id="总目录">总目录</h2>
+<hr />
+<h3 id="第一部分全景视角第-14-章">第一部分：全景视角（第 1–4 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 1 章</td>
+<td>一次请求的完整旅程</td>
+<td><a href="ch01.html">ch01.md</a></td>
+</tr>
+<tr>
+<td>第 2 章</td>
+<td>架构分层与模块划分</td>
+<td><a href="ch02.html">ch02.md</a></td>
+</tr>
+<tr>
+<td>第 3 章</td>
+<td>核心设计原则</td>
+<td><a href="ch03.html">ch03.md</a></td>
+</tr>
+<tr>
+<td>第 4 章</td>
+<td>技术选型与权衡</td>
+<td><a href="ch04.html">ch04.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第二部分agent-引擎核心循环第-59-章">第二部分：Agent 引擎——核心循环（第 5–9 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 5 章</td>
+<td>Agentic Loop——Agent 的心脏</td>
+<td><a href="ch05.html">ch05.md</a></td>
+</tr>
+<tr>
+<td>第 6 章</td>
+<td>流式响应架构</td>
+<td><a href="ch06.html">ch06.md</a></td>
+</tr>
+<tr>
+<td>第 7 章</td>
+<td>工具调度与并发执行</td>
+<td><a href="ch07.html">ch07.md</a></td>
+</tr>
+<tr>
+<td>第 8 章</td>
+<td>Plan Mode——思考与行动的分离</td>
+<td><a href="ch08.html">ch08.md</a></td>
+</tr>
+<tr>
+<td>第 9 章</td>
+<td>QueryEngine——查询编排器</td>
+<td><a href="ch09.html">ch09.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第三部分上下文管理agent-的记忆第-1013-章">第三部分：上下文管理——Agent 的记忆（第 10–13 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 10 章</td>
+<td>上下文窗口——Agent 最稀缺的资源</td>
+<td><a href="ch10.html">ch10.md</a></td>
+</tr>
+<tr>
+<td>第 11 章</td>
+<td>上下文组装——给 Agent 看什么</td>
+<td><a href="ch11.html">ch11.md</a></td>
+</tr>
+<tr>
+<td>第 12 章</td>
+<td>上下文压缩与摘要（Compact）</td>
+<td><a href="ch12.html">ch12.md</a></td>
+</tr>
+<tr>
+<td>第 13 章</td>
+<td>跨会话记忆（SessionMemory）</td>
+<td><a href="ch13.html">ch13.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第四部分工具系统agent-的双手第-1419-章">第四部分：工具系统——Agent 的双手（第 14–19 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 14 章</td>
+<td>工具架构——统一接口与注册表</td>
+<td><a href="ch14.html">ch14.md</a></td>
+</tr>
+<tr>
+<td>第 15 章</td>
+<td>文件操作工具的设计哲学</td>
+<td><a href="ch15.html">ch15.md</a></td>
+</tr>
+<tr>
+<td>第 16 章</td>
+<td>Shell 执行——Agent 最危险的工具</td>
+<td><a href="ch16.html">ch16.md</a></td>
+</tr>
+<tr>
+<td>第 17 章</td>
+<td>搜索工具——让 Agent 找到信息</td>
+<td><a href="ch17.html">ch17.md</a></td>
+</tr>
+<tr>
+<td>第 18 章</td>
+<td>子 Agent 调度——AgentTool 与任务委派</td>
+<td><a href="ch18.html">ch18.md</a></td>
+</tr>
+<tr>
+<td>第 19 章</td>
+<td>MCP——开放的工具协议</td>
+<td><a href="ch19.html">ch19.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第五部分权限与安全agent-的缰绳第-2023-章">第五部分：权限与安全——Agent 的缰绳（第 20–23 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 20 章</td>
+<td>权限模型——信任与控制</td>
+<td><a href="ch20.html">ch20.md</a></td>
+</tr>
+<tr>
+<td>第 21 章</td>
+<td>权限的运行时执行</td>
+<td><a href="ch21.html">ch21.md</a></td>
+</tr>
+<tr>
+<td>第 22 章</td>
+<td>沙箱——Agent 的活动围栏</td>
+<td><a href="ch22.html">ch22.md</a></td>
+</tr>
+<tr>
+<td>第 23 章</td>
+<td>安全设计总结——纵深防御</td>
+<td><a href="ch23.html">ch23.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第六部分多-agent-协作第-2427-章">第六部分：多 Agent 协作（第 24–27 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 24 章</td>
+<td>Swarm——多 Agent 协调架构</td>
+<td><a href="ch24.html">ch24.md</a></td>
+</tr>
+<tr>
+<td>第 25 章</td>
+<td>Worktree——并行工作流</td>
+<td><a href="ch25.html">ch25.md</a></td>
+</tr>
+<tr>
+<td>第 26 章</td>
+<td>Teleport——远程协作</td>
+<td><a href="ch26.html">ch26.md</a></td>
+</tr>
+<tr>
+<td>第 27 章</td>
+<td>后台任务与异步执行</td>
+<td><a href="ch27.html">ch27.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第七部分状态管理第-2830-章">第七部分：状态管理（第 28–30 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 28 章</td>
+<td>全局状态设计</td>
+<td><a href="ch28.html">ch28.md</a></td>
+</tr>
+<tr>
+<td>第 29 章</td>
+<td>状态变更与响应式更新</td>
+<td><a href="ch29.html">ch29.md</a></td>
+</tr>
+<tr>
+<td>第 30 章</td>
+<td>对话历史的持久化与恢复</td>
+<td><a href="ch30.html">ch30.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第八部分终端-ui-架构第-3134-章">第八部分：终端 UI 架构（第 31–34 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 31 章</td>
+<td>React 在终端——Ink 框架的设计</td>
+<td><a href="ch31.html">ch31.md</a></td>
+</tr>
+<tr>
+<td>第 32 章</td>
+<td>消息渲染——从 AI 输出到终端显示</td>
+<td><a href="ch32.html">ch32.md</a></td>
+</tr>
+<tr>
+<td>第 33 章</td>
+<td>输入系统——用户如何与 Agent 交互</td>
+<td><a href="ch33.html">ch33.md</a></td>
+</tr>
+<tr>
+<td>第 34 章</td>
+<td>虚拟滚动与渲染性能</td>
+<td><a href="ch34.html">ch34.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第九部分可扩展性架构第-3538-章">第九部分：可扩展性架构（第 35–38 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 35 章</td>
+<td>命令系统——可插拔的命令架构</td>
+<td><a href="ch35.html">ch35.md</a></td>
+</tr>
+<tr>
+<td>第 36 章</td>
+<td>插件系统——第三方扩展机制</td>
+<td><a href="ch36.html">ch36.md</a></td>
+</tr>
+<tr>
+<td>第 37 章</td>
+<td>技能系统（Skills）</td>
+<td><a href="ch37.html">ch37.md</a></td>
+</tr>
+<tr>
+<td>第 38 章</td>
+<td>Feature Flag 与渐进式发布</td>
+<td><a href="ch38.html">ch38.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第十部分系统韧性第-3942-章">第十部分：系统韧性（第 39–42 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 39 章</td>
+<td>错误处理与重试策略</td>
+<td><a href="ch39.html">ch39.md</a></td>
+</tr>
+<tr>
+<td>第 40 章</td>
+<td>成本控制与速率限制</td>
+<td><a href="ch40.html">ch40.md</a></td>
+</tr>
+<tr>
+<td>第 41 章</td>
+<td>OAuth 与认证架构</td>
+<td><a href="ch41.html">ch41.md</a></td>
+</tr>
+<tr>
+<td>第 42 章</td>
+<td>可观测性——日志、遥测与诊断</td>
+<td><a href="ch42.html">ch42.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第十一部分启动与生命周期第-4344-章">第十一部分：启动与生命周期（第 43–44 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 43 章</td>
+<td>启动流程——从命令行到 Agent 就绪</td>
+<td><a href="ch43.html">ch43.md</a></td>
+</tr>
+<tr>
+<td>第 44 章</td>
+<td>应用状态机——从引导到就绪</td>
+<td><a href="ch44.html">ch44.md</a></td>
+</tr>
+</tbody></table>
+<h3 id="第十二部分总结第-45-章">第十二部分：总结（第 45 章）</h3>
+<table><thead><tr>
+<th>章节</th>
+<th>标题</th>
+<th>文件</th>
+</tr></thead><tbody>
+<tr>
+<td>第 45 章</td>
+<td>架构模式总结与启示</td>
+<td><a href="ch45.html">ch45.md</a></td>
+</tr>
+</tbody></table>
+<hr />
+<h2 id="全书统计">全书统计</h2>
+<ul>
+<li><strong>总章节数</strong>：45 章</li>
+<li><strong>分为</strong>：12 个部分</li>
+<li><strong>每章包含</strong>：架构分析、设计思想讲解、Mermaid 图表、源码引用</li>
+</ul>
+<h2 id="阅读建议">阅读建议</h2>
+<ul>
+<li><strong>入门路径</strong>：从第一部分（第 1–4 章）开始，建立全景认知</li>
+<li><strong>核心必读</strong>：第 5 章（Agent 循环）、第 14 章（工具架构）、第 20 章（权限模型）</li>
+<li><strong>实践导向</strong>：第 45 章（总结）提炼了七个核心架构模式，适合快速回顾</li>
+<li><strong>按兴趣跳读</strong>：每个部分相对独立，可根据兴趣选择性阅读</li>
+</ul>
+        </article>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>第 5 章：Agentic Loop——Agent 的心脏</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="assets/style.css" />
+    <script src="assets/mermaid.min.js"></script>
+    <script src="assets/book.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar"><a class="book-home" href="index.html">目录</a><ul><li><a href="ch01.html">一次请求的完整旅程</a></li>
+<li><a href="ch02.html">架构分层与模块划分</a></li>
+<li><a href="ch03.html">核心设计原则</a></li>
+<li><a href="ch04.html">技术选型与权衡</a></li>
+<li class="active"><a href="ch05.html">Agentic Loop——Agent 的心脏</a></li>
+<li><a href="ch06.html">流式响应架构</a></li>
+<li><a href="ch07.html">工具调度与并发执行</a></li>
+<li><a href="ch08.html">Plan Mode——思考与行动的分离</a></li>
+<li><a href="ch09.html">QueryEngine——查询编排器</a></li>
+<li><a href="ch10.html">上下文窗口——Agent 最稀缺的资源</a></li>
+<li><a href="ch11.html">上下文组装——给 Agent 看什么</a></li>
+<li><a href="ch12.html">上下文压缩与摘要（Compact）</a></li>
+<li><a href="ch13.html">跨会话记忆（SessionMemory）</a></li>
+<li><a href="ch14.html">工具架构——统一接口与注册表</a></li>
+<li><a href="ch15.html">文件操作工具的设计哲学</a></li>
+<li><a href="ch16.html">Shell 执行——Agent 最危险的工具</a></li>
+<li><a href="ch17.html">搜索工具——让 Agent 找到信息</a></li>
+<li><a href="ch18.html">子 Agent 调度——AgentTool 与任务委派</a></li>
+<li><a href="ch19.html">MCP——开放的工具协议</a></li>
+<li><a href="ch20.html">权限模型——信任与控制</a></li>
+<li><a href="ch21.html">权限的运行时执行</a></li>
+<li><a href="ch22.html">沙箱——Agent 的活动围栏</a></li>
+<li><a href="ch23.html">安全设计总结——纵深防御</a></li>
+<li><a href="ch24.html">Swarm——多 Agent 协调架构</a></li>
+<li><a href="ch25.html">Worktree——并行工作流</a></li>
+<li><a href="ch26.html">Teleport——远程协作</a></li>
+<li><a href="ch27.html">后台任务与异步执行</a></li>
+<li><a href="ch28.html">全局状态设计</a></li>
+<li><a href="ch29.html">状态变更与响应式更新</a></li>
+<li><a href="ch30.html">对话历史的持久化与恢复</a></li>
+<li><a href="ch31.html">React 在终端——Ink 框架的设计</a></li>
+<li><a href="ch32.html">消息渲染——从 AI 输出到终端显示</a></li>
+<li><a href="ch33.html">输入系统——用户如何与 Agent 交互</a></li>
+<li><a href="ch34.html">虚拟滚动与渲染性能</a></li>
+<li><a href="ch35.html">命令系统——可插拔的命令架构</a></li>
+<li><a href="ch36.html">插件系统——第三方扩展机制</a></li>
+<li><a href="ch37.html">技能系统（Skills）</a></li>
+<li><a href="ch38.html">Feature Flag 与渐进式发布</a></li>
+<li><a href="ch39.html">错误处理与重试策略</a></li>
+<li><a href="ch40.html">成本控制与速率限制</a></li>
+<li><a href="ch41.html">OAuth 与认证架构</a></li>
+<li><a href="ch42.html">可观测性——日志、遥测与诊断</a></li>
+<li><a href="ch43.html">启动流程——从命令行到 Agent 就绪</a></li>
+<li><a href="ch44.html">应用状态机——从引导到就绪</a></li>
+<li><a href="ch45.html">架构模式总结与启示</a></li></ul></nav>
+      <main class="content">
+        <article class="article">
+          <h1 id="第-5-章agentic-loopagent-的心脏">第 5 章：Agentic Loop——Agent 的心脏</h1>
+<h2 id="核心设计问题">核心设计问题</h2>
+<p>一个 AI Agent 的本质是什么？不是 LLM 调用，不是工具定义，而是一个<strong>循环</strong>。Claude Code 的核心是一个 <code>while(true)</code> 循环——它接收用户消息、调用 LLM、解析响应、执行工具、将工具结果注入上下文、再次调用 LLM，直到模型认为任务完成。</p>
+<p>这个循环的每一次迭代称为一个 <strong>turn</strong>（轮次）。一个复杂的编程任务可能需要 10-50 个 turn，涉及数十次工具调用。<code>query.ts</code> 中的 <code>query()</code> 函数就是这个循环的具现化。</p>
+<div class="mermaid-block"><div class="mermaid">stateDiagram-v2
+    [*] --> BuildContext: 用户输入
+
+    BuildContext --> CallLLM: 准备消息 + 系统提示词
+    CallLLM --> ParseResponse: 流式接收 token
+
+    ParseResponse --> HasToolUse: 检测 tool_use block?
+    ParseResponse --> NoToolUse: 纯文本响应
+
+    HasToolUse --> ExecuteTools: 执行工具调用
+    ExecuteTools --> InjectResults: 收集工具结果
+    InjectResults --> BuildContext: 更新 state, continue
+
+    NoToolUse --> CheckStopHooks: 触发停止钩子
+    CheckStopHooks --> [*]: reason: completed
+
+    HasToolUse --> MaxTurns: 超过轮次限制?
+    MaxTurns --> [*]: reason: max_turns
+
+    BuildContext --> Aborted: 用户中断 (Ctrl+C)
+    Aborted --> [*]: reason: aborted</div></div>
+<h2 id="为什么用-asyncgenerator-实现">为什么用 AsyncGenerator 实现？</h2>
+<p><code>query()</code> 函数的签名是 <code>async function* query(): AsyncGenerator</code>。这是一个深思熟虑的架构选择。</p>
+<p>传统设计可能返回一个 Promise，但这有一个致命问题：<strong>用户无法实时看到 Agent 的思考过程</strong>。Agent 的一个 turn 可能持续 30 秒到数分钟——在这期间，用户面对一个空白的终端。</p>
+<p>AsyncGenerator（<code>async function*</code>）通过 <code>yield</code> 关键字解决了这个问题。每当循环中有新的事件产生——一个流式 token、一个工具调用、一个进度更新——就立刻 <code>yield</code> 出去，让调用方（UI 层、SDK 消费者）能够实时渲染。</p>
+<pre><code class="language-typescript">// query.ts 的核心结构
+export async function* query(params: QueryParams): AsyncGenerator&lt;...&gt; {
+  const terminal = yield* queryLoop(params, consumedCommandUuids)
+  return terminal
+}</code></pre>
+<p>这种设计的另一层含义是<strong>背压（backpressure）天然存在</strong>。如果消费者处理不过来（比如 UI 渲染慢），Generator 会自动暂停，不会导致内存溢出。这比回调或事件发射器（EventEmitter）更安全。</p>
+<h3 id="设计启示">设计启示</h3>
+<blockquote><p>当构建一个长时间运行的 Agent 系统时，优先考虑 <code>AsyncGenerator</code> 而非 <code>Promise</code> 或 <code>Observable</code>。它提供了天然的单向数据流、自动背压控制，以及与 <code>for await...of</code> 语法的完美配合。</p></blockquote>
+<h2 id="循环状态机">循环状态机</h2>
+<p>循环的核心是一个 <code>while(true)</code> 结构，配合一个可变的 <code>State</code> 对象在迭代间传递状态。让我们看看每一次迭代到底发生了什么。</p>
+<div class="mermaid-block"><div class="mermaid">flowchart TD
+    A["while(true) 迭代开始"] --> B["解构 State"]
+    B --> C["上下文管理管道"]
+    C --> C1["applyToolResultBudget<br/>工具结果预算"]
+    C1 --> C2["snipCompactIfNeeded<br/>历史裁剪"]
+    C2 --> C3["microcompact<br/>微压缩"]
+    C3 --> C4["autocompact<br/>自动压缩"]
+    C4 --> D["构建 System Prompt"]
+    D --> E["检查 token 阻塞上限"]
+    E --> F["调用 LLM (流式)"]
+    F --> G{"有 tool_use block?"}
+
+    G -->|是| H["执行工具"]
+    G -->|否| I{"stop_reason 检查"}
+
+    I --> I1["prompt_too_long?"]
+    I1 -->|恢复| C
+    I1 -->|无法恢复| J["返回 completed"]
+
+    I --> I2["max_output_tokens?"]
+    I2 -->|重试| C
+    I2 -->|超限| J
+
+    I --> I3["API 错误?"]
+    I3 --> J
+
+    I --> I4["Stop Hooks"]
+    I4 -->|blocking| C
+    I4 --> J
+
+    H --> K{"中断?"}
+    K -->|是| L["返回 aborted"]
+    K -->|否| M["处理附件 / 排队命令"]
+    M --> N{"超过 maxTurns?"}
+    N -->|是| O["返回 max_turns"]
+    N -->|否| P["更新 State, continue"]
+    P --> A</div></div>
+<p>State 对象的设计简洁但信息密集：</p>
+<pre><code class="language-typescript">type State = {
+  messages: Message[]           // 当前消息历史
+  toolUseContext: ToolUseContext // 工具执行上下文
+  autoCompactTracking: AutoCompactTrackingState | undefined
+  maxOutputTokensRecoveryCount: number
+  hasAttemptedReactiveCompact: boolean
+  maxOutputTokensOverride: number | undefined
+  pendingToolUseSummary: Promise&lt;ToolUseSummaryMessage | null&gt; | undefined
+  stopHookActive: boolean | undefined
+  turnCount: number             // 当前轮次计数
+  transition: Continue | undefined  // 上一次 continue 的原因
+}</code></pre>
+<p>注意 <code>transition</code> 字段——它记录了上一次循环为什么 <code>continue</code>。这不是调试信息，而是<strong>逻辑门控</strong>。例如，当 <code>transition.reason === 'collapse_drain_retry'</code> 时，说明上一次迭代尝试了上下文坍缩恢复但仍失败，所以这次不应再尝试同一路径。</p>
+<h3 id="设计启示">设计启示</h3>
+<blockquote><p>不要用零散的 boolean flag 追踪循环状态。用一个结构化的 <code>State</code> 对象 + <code>transition</code> 原因字段，可以让 continue 路径有清晰的决策依据，避免无限重试循环。</p></blockquote>
+<h2 id="循环终止条件">循环终止条件</h2>
+<p>Agent 循环必须能够终止，否则就是一个无限循环的噩梦。Claude Code 有多个终止路径，每个都有不同的语义。</p>
+<h3 id="1-自然终止模型输出纯文本">1. 自然终止：模型输出纯文本</h3>
+<p>当 LLM 的响应中不包含任何 <code>tool_use</code> block 时（<code>needsFollowUp === false</code>），循环准备终止。但&quot;准备终止&quot;不等于&quot;终止&quot;——还有一系列检查：</p>
+<pre><code class="language-typescript">if (!needsFollowUp) {
+  // 检查 prompt_too_long 恢复
+  // 检查 max_output_tokens 恢复
+  // 检查 API 错误
+  // 执行 Stop Hooks
+  // 检查 Token Budget
+  return { reason: 'completed' }
+}</code></pre>
+<h3 id="2-轮次限制maxturns">2. 轮次限制：maxTurns</h3>
+<p>SDK 调用者可以设置 <code>maxTurns</code> 参数。每个 turn（一次 LLM 调用 + 工具执行）计数一次。超出限制时，循环 yield 一个 <code>max_turns_reached</code> 附件消息后终止：</p>
+<pre><code class="language-typescript">if (maxTurns &amp;&amp; nextTurnCount &gt; maxTurns) {
+  yield createAttachmentMessage({
+    type: 'max_turns_reached',
+    maxTurns,
+    turnCount: nextTurnCount,
+  })
+  return { reason: 'max_turns', turnCount: nextTurnCount }
+}</code></pre>
+<h3 id="3-用户中断abortcontroller">3. 用户中断：AbortController</h3>
+<p>用户按 Ctrl+C 时，<code>abortController.signal.aborted</code> 变为 true。循环在多个关键点检查这个信号：</p>
+<ul>
+<li>流式接收中：中断后，StreamingToolExecutor 生成合成的错误 tool_result</li>
+<li>工具执行中：子进程收到 SIGTERM，正在排队的工具收到取消消息</li>
+<li>工具执行后：检查信号，yield 中断消息后返回</li>
+</ul>
+<pre><code class="language-typescript">if (toolUseContext.abortController.signal.aborted) {
+  // 处理中断...
+  return { reason: 'aborted_streaming' }
+}</code></pre>
+<h3 id="4-预算限制maxbudgetusd">4. 预算限制：maxBudgetUsd</h3>
+<p>SDK 调用者可以设置美元预算上限。每次 yield 后，循环检查累计花费：</p>
+<pre><code class="language-typescript">if (maxBudgetUsd !== undefined &amp;&amp; getTotalCost() &gt;= maxBudgetUsd) {
+  yield { type: 'result', subtype: 'error_max_budget_usd', ... }
+  return
+}</code></pre>
+<h3 id="5-错误终止">5. 错误终止</h3>
+<ul>
+<li><strong>模型错误</strong>：API 调用异常、图片过大等</li>
+<li><strong>阻塞限制</strong>：上下文 token 数超过硬性上限</li>
+<li><strong>Stop Hook 阻止</strong>：外部钩子判定不应继续</li>
+</ul>
+<div class="mermaid-block"><div class="mermaid">flowchart LR
+    subgraph 终止原因
+        A[completed] --> A1["模型自然结束"]
+        A2["stop_hook_prevented"]
+        B[max_turns] --> B1["轮次上限"]
+        C[aborted] --> C1["用户中断"]
+        D[error] --> D1["模型错误"]
+        D2["blocking_limit"]
+        D3["prompt_too_long"]
+        E[max_budget] --> E1["预算超限"]
+    end</div></div>
+<h2 id="中断机制的精妙设计">中断机制的精妙设计</h2>
+<p>中断不是简单的&quot;停止一切&quot;。Claude Code 的中断处理是一个多层次的系统。</p>
+<h3 id="层次一abortcontroller-级联">层次一：AbortController 级联</h3>
+<p><code>AbortController</code> 是 Web 标准 API，但 Claude Code 对它进行了扩展。<code>toolUseContext.abortController</code> 是父控制器，每个工具执行会创建<strong>子控制器</strong>（<code>createChildAbortController</code>）。这意味着：</p>
+<ul>
+<li>中断父控制器 → 所有子控制器被中断</li>
+<li>中断子控制器 → 父控制器不受影响（除非特定条件）</li>
+<li>StreamingToolExecutor 还有一个 <code>siblingAbortController</code>——当一个 Bash 工具出错时，兄弟工具被取消，但整个查询不终止</li>
+</ul>
+<h3 id="层次二合成错误消息">层次二：合成错误消息</h3>
+<p>中断时，所有未完成的 <code>tool_use</code> block 都需要一个配对的 <code>tool_result</code>，否则 API 会在下次调用时报错。循环通过 <code>yieldMissingToolResultBlocks</code> 生成合成的错误结果：</p>
+<pre><code class="language-typescript">function* yieldMissingToolResultBlocks(
+  assistantMessages: AssistantMessage[],
+  errorMessage: string,
+) {
+  for (const assistantMessage of assistantMessages) {
+    const toolUseBlocks = assistantMessage.message.content.filter(
+      content =&gt; content.type === 'tool_use',
+    ) as ToolUseBlock[]
+    for (const toolUse of toolUseBlocks) {
+      yield createUserMessage({
+        content: [{
+          type: 'tool_result',
+          content: errorMessage,
+          is_error: true,
+          tool_use_id: toolUse.id,
+        }],
+      })
+    }
+  }
+}</code></pre>
+<h3 id="层次三优雅中断-vs-强制中断">层次三：优雅中断 vs 强制中断</h3>
+<p>当用户发送新消息（而非按 Esc）中断时，<code>abortController.signal.reason</code> 为 <code>'interrupt'</code>。此时循环跳过&quot;用户中断&quot;消息，因为排队的新消息本身提供了足够的上下文：</p>
+<pre><code class="language-typescript">if (toolUseContext.abortController.signal.reason !== 'interrupt') {
+  yield createUserInterruptionMessage({ toolUse: false })
+}</code></pre>
+<h3 id="设计启示">设计启示</h3>
+<blockquote><p>Agent 系统的中断设计不能是简单的 kill -9。需要：(1) 确保所有 tool_use 都有配对的 tool_result，(2) 区分用户主动中断和新消息提交，(3) 在流式接收和工具执行两个阶段分别处理。AbortController 的父子级联是管理这种复杂性的利器。</p></blockquote>
+<h2 id="上下文管理管道">上下文管理管道</h2>
+<p>在每次循环迭代的开头，有一段容易被忽视但极其重要的代码——<strong>上下文管理管道</strong>。它决定了模型在这次调用中&quot;看到&quot;什么。</p>
+<div class="mermaid-block"><div class="mermaid">flowchart TD
+    A["原始消息历史"] --> B["getMessagesAfterCompactBoundary<br/>只取压缩边界后的消息"]
+    B --> C["applyToolResultBudget<br/>限制工具结果总大小"]
+    C --> D["snipCompactIfNeeded<br/>历史裁剪（特征门控）"]
+    D --> E["microcompact<br/>微压缩（缓存编辑）"]
+    E --> F["applyCollapsesIfNeeded<br/>上下文坍缩（特征门控）"]
+    F --> G["autocompact<br/>自动压缩（token 超限触发）"]
+    G --> H["最终 messagesForQuery"]</div></div>
+<p>这个管道的执行顺序至关重要：</p>
+<ol>
+<li><strong>工具结果预算</strong>先于压缩——压缩依赖 <code>tool_use_id</code> 做缓存匹配，内容替换对它不可见</li>
+<li><strong>裁剪（Snip）</strong>先于微压缩——裁剪释放的 token 数需要传递给自动压缩的阈值检查</li>
+<li><strong>微压缩</strong>先于自动压缩——如果微压缩已经足够，就避免代价更高的自动压缩</li>
+<li><strong>上下文坍缩</strong>先于自动压缩——坍缩保留粒度更细的上下文</li>
+</ol>
+<h3 id="设计启示">设计启示</h3>
+<blockquote><p>当系统的多个阶段都可能修改同一份数据时，执行顺序不只是&quot;先来后到&quot;——它是正确性的保证。显式地用管道（pipeline）模式组织这些阶段，比隐式地散落在代码各处要安全得多。</p></blockquote>
+<h2 id="maxoutputtokens-恢复机制">max_output_tokens 恢复机制</h2>
+<p>这是循环中一个巧妙的自愈机制。当模型的输出 token 达到上限时，响应被截断——模型可能正写到一半。Claude Code 不会直接告诉用户&quot;输出被截断&quot;，而是：</p>
+<ol>
+<li><strong>扣留（withhold）错误消息</strong>：在流式接收期间，检测到 <code>max_output_tokens</code> 错误时不立即 yield</li>
+<li><strong>尝试升级</strong>：第一次重试时，将 <code>maxOutputTokensOverride</code> 从默认的 ~8K 提升到 ~64K</li>
+<li><strong>注入恢复消息</strong>：如果升级后仍然超限，注入一条元消息告诉模型&quot;直接继续，不要道歉，不要回顾&quot;</li>
+<li><strong>限制重试次数</strong>：最多 3 次恢复尝试</li>
+</ol>
+<pre><code class="language-typescript">if (maxOutputTokensRecoveryCount &lt; MAX_OUTPUT_TOKENS_RECOVERY_LIMIT) {
+  const recoveryMessage = createUserMessage({
+    content: 'Output token limit hit. Resume directly — no apology, no recap...',
+    isMeta: true,
+  })
+  // 更新 state, continue
+}</code></pre>
+<h3 id="设计启示">设计启示</h3>
+<blockquote><p>Agent 系统必须优雅处理 LLM 的各种限制条件。不要把错误直接暴露给用户——在用户看到之前，尝试自动恢复。但恢复本身也必须有上限，否则就会陷入恢复循环。</p></blockquote>
+<h2 id="模型回退fallback">模型回退（Fallback）</h2>
+<p>当主模型（如 Opus）过载返回 529 错误时，系统会回退到备选模型（如 Sonnet）。回退处理极其细致：</p>
+<pre><code class="language-typescript">catch (innerError) {
+  if (innerError instanceof FallbackTriggeredError &amp;&amp; fallbackModel) {
+    // 切换模型
+    currentModel = fallbackModel
+    // 清理旧的 assistant 消息——不同模型的 thinking 签名不兼容
+    assistantMessages.length = 0
+    toolResults.length = 0
+    toolUseBlocks.length = 0
+    // 丢弃 StreamingToolExecutor 的结果
+    if (streamingToolExecutor) {
+      streamingToolExecutor.discard()
+      streamingToolExecutor = new StreamingToolExecutor(...)
+    }
+    // 剥离签名块（模型特定）
+    messagesForQuery = stripSignatureBlocks(messagesForQuery)
+    // 通知用户
+    yield createSystemMessage(`Switched to ${fallbackModel}...`)
+  }
+}</code></pre>
+<p>关键细节：不同模型的 thinking block 有不同的加密签名。如果将 Opus 的签名 thinking block 发送给 Sonnet，API 会返回 400 错误。因此回退时必须 <code>stripSignatureBlocks</code>。</p>
+<h2 id="与-queryengine-的分工">与 QueryEngine 的分工</h2>
+<p><code>query.ts</code> 中的 <code>query()</code> 函数是纯粹的<strong>循环逻辑</strong>——它不知道会话持久化、成本追踪、消息重放等概念。这些责任由上层的 <code>QueryEngine</code>（<code>QueryEngine.ts</code>）承担。</p>
+<p>这种分离的好处是：</p>
+<ul>
+<li><code>query.ts</code> 可以被不同场景复用（REPL 交互模式、SDK 调用、子 Agent）</li>
+<li><code>QueryEngine</code> 处理一次完整的用户提交，<code>query()</code> 处理内部的 agentic 循环</li>
+<li>测试时可以单独测试循环逻辑，不必模拟整个会话基础设施</li>
+</ul>
+<p>在下一章，我们将深入流式响应架构——这个让 <code>yield</code> 实时到达用户屏幕的管道系统。</p>
+          
+    <div class="pager">
+      <a href="ch04.html">上一页：技术选型与权衡</a>
+      <a href="ch06.html">下一页：流式响应架构</a>
+    </div>
+  
+        </article>
+        <aside class="page-toc"><h2>本页导航</h2><ul><li class="toc-level-2"><a href="#核心设计问题">核心设计问题</a></li>
+<li class="toc-level-2"><a href="#为什么用-asyncgenerator-实现">为什么用 AsyncGenerator 实现？</a></li>
+<li class="toc-level-3"><a href="#设计启示">设计启示</a></li>
+<li class="toc-level-2"><a href="#循环状态机">循环状态机</a></li>
+<li class="toc-level-3"><a href="#设计启示">设计启示</a></li>
+<li class="toc-level-2"><a href="#循环终止条件">循环终止条件</a></li>
+<li class="toc-level-3"><a href="#1-自然终止模型输出纯文本">1. 自然终止：模型输出纯文本</a></li>
+<li class="toc-level-3"><a href="#2-轮次限制maxturns">2. 轮次限制：maxTurns</a></li>
+<li class="toc-level-3"><a href="#3-用户中断abortcontroller">3. 用户中断：AbortController</a></li>
+<li class="toc-level-3"><a href="#4-预算限制maxbudgetusd">4. 预算限制：maxBudgetUsd</a></li>
+<li class="toc-level-3"><a href="#5-错误终止">5. 错误终止</a></li>
+<li class="toc-level-2"><a href="#中断机制的精妙设计">中断机制的精妙设计</a></li>
+<li class="toc-level-3"><a href="#层次一abortcontroller-级联">层次一：AbortController 级联</a></li>
+<li class="toc-level-3"><a href="#层次二合成错误消息">层次二：合成错误消息</a></li>
+<li class="toc-level-3"><a href="#层次三优雅中断-vs-强制中断">层次三：优雅中断 vs 强制中断</a></li>
+<li class="toc-level-3"><a href="#设计启示">设计启示</a></li>
+<li class="toc-level-2"><a href="#上下文管理管道">上下文管理管道</a></li>
+<li class="toc-level-3"><a href="#设计启示">设计启示</a></li>
+<li class="toc-level-2"><a href="#maxoutputtokens-恢复机制">max_output_tokens 恢复机制</a></li>
+<li class="toc-level-3"><a href="#设计启示">设计启示</a></li>
+<li class="toc-level-2"><a href="#模型回退fallback">模型回退（Fallback）</a></li>
+<li class="toc-level-2"><a href="#与-queryengine-的分工">与 QueryEngine 的分工</a></li></ul></aside>
+      </main>
+    </div>
+  </body>
+</html>

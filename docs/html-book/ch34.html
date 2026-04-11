@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>第 34 章：虚拟滚动与渲染性能</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="assets/style.css" />
+    <script src="assets/mermaid.min.js"></script>
+    <script src="assets/book.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar"><a class="book-home" href="index.html">目录</a><ul><li><a href="ch01.html">一次请求的完整旅程</a></li>
+<li><a href="ch02.html">架构分层与模块划分</a></li>
+<li><a href="ch03.html">核心设计原则</a></li>
+<li><a href="ch04.html">技术选型与权衡</a></li>
+<li><a href="ch05.html">Agentic Loop——Agent 的心脏</a></li>
+<li><a href="ch06.html">流式响应架构</a></li>
+<li><a href="ch07.html">工具调度与并发执行</a></li>
+<li><a href="ch08.html">Plan Mode——思考与行动的分离</a></li>
+<li><a href="ch09.html">QueryEngine——查询编排器</a></li>
+<li><a href="ch10.html">上下文窗口——Agent 最稀缺的资源</a></li>
+<li><a href="ch11.html">上下文组装——给 Agent 看什么</a></li>
+<li><a href="ch12.html">上下文压缩与摘要（Compact）</a></li>
+<li><a href="ch13.html">跨会话记忆（SessionMemory）</a></li>
+<li><a href="ch14.html">工具架构——统一接口与注册表</a></li>
+<li><a href="ch15.html">文件操作工具的设计哲学</a></li>
+<li><a href="ch16.html">Shell 执行——Agent 最危险的工具</a></li>
+<li><a href="ch17.html">搜索工具——让 Agent 找到信息</a></li>
+<li><a href="ch18.html">子 Agent 调度——AgentTool 与任务委派</a></li>
+<li><a href="ch19.html">MCP——开放的工具协议</a></li>
+<li><a href="ch20.html">权限模型——信任与控制</a></li>
+<li><a href="ch21.html">权限的运行时执行</a></li>
+<li><a href="ch22.html">沙箱——Agent 的活动围栏</a></li>
+<li><a href="ch23.html">安全设计总结——纵深防御</a></li>
+<li><a href="ch24.html">Swarm——多 Agent 协调架构</a></li>
+<li><a href="ch25.html">Worktree——并行工作流</a></li>
+<li><a href="ch26.html">Teleport——远程协作</a></li>
+<li><a href="ch27.html">后台任务与异步执行</a></li>
+<li><a href="ch28.html">全局状态设计</a></li>
+<li><a href="ch29.html">状态变更与响应式更新</a></li>
+<li><a href="ch30.html">对话历史的持久化与恢复</a></li>
+<li><a href="ch31.html">React 在终端——Ink 框架的设计</a></li>
+<li><a href="ch32.html">消息渲染——从 AI 输出到终端显示</a></li>
+<li><a href="ch33.html">输入系统——用户如何与 Agent 交互</a></li>
+<li class="active"><a href="ch34.html">虚拟滚动与渲染性能</a></li>
+<li><a href="ch35.html">命令系统——可插拔的命令架构</a></li>
+<li><a href="ch36.html">插件系统——第三方扩展机制</a></li>
+<li><a href="ch37.html">技能系统（Skills）</a></li>
+<li><a href="ch38.html">Feature Flag 与渐进式发布</a></li>
+<li><a href="ch39.html">错误处理与重试策略</a></li>
+<li><a href="ch40.html">成本控制与速率限制</a></li>
+<li><a href="ch41.html">OAuth 与认证架构</a></li>
+<li><a href="ch42.html">可观测性——日志、遥测与诊断</a></li>
+<li><a href="ch43.html">启动流程——从命令行到 Agent 就绪</a></li>
+<li><a href="ch44.html">应用状态机——从引导到就绪</a></li>
+<li><a href="ch45.html">架构模式总结与启示</a></li></ul></nav>
+      <main class="content">
+        <article class="article">
+          <h1 id="第-34-章虚拟滚动与渲染性能">第 34 章：虚拟滚动与渲染性能</h1>
+<h2 id="设计之问终端也需要虚拟滚动吗">设计之问：终端也需要虚拟滚动吗？</h2>
+<p>在 Web 开发中，虚拟滚动是一个成熟的话题：渲染 10000 条微博会卡顿，所以只渲染视口内的几十条。但在终端里，谁会有 10000 条消息？</p>
+<p>答案是：一个长时间运行的 AI Agent 交互完全可以产生数百甚至数千条消息。一次代码重构任务可能触发 50+ 次文件编辑，每次编辑都有 diff 输出。一次调试会话可能产生数十条 bash 命令输出。一段长时间的 Agent 运行可能积累上千条消息。</p>
+<p>更重要的是，终端的渲染能力远弱于浏览器。浏览器有 GPU 加速的复合层渲染，终端只有 stdout 这个同步字符流。每帧需要传输的 ANSI 转义序列数量与渲染区域成正比。在 tmux 或 SSH 环境中，带宽瓶颈更加明显——1000 条消息的全量渲染可能产生数百 KB 的 ANSI 数据。</p>
+<p>Claude Code 在全屏模式下使用了虚拟滚动来解决这个问题。这是终端应用中极其罕见的设计决策，但它是长对话场景下流畅体验的保障。</p>
+<h2 id="虚拟滚动的核心算法">虚拟滚动的核心算法</h2>
+<h3 id="从-scrollbox-到虚拟化">从 ScrollBox 到虚拟化</h3>
+<p><code>ink/components/ScrollBox.tsx</code> 是滚动的基础设施。它是一个支持 <code>overflow: scroll</code> 的 Box 组件，提供命令式的 <code>scrollTo</code>、<code>scrollBy</code>、<code>scrollToBottom</code> 等 API。</p>
+<p>ScrollBox 本身实现了视口裁剪（viewport culling）——只渲染在视口内的子组件。但这还不够，因为 React 仍然需要为所有子组件创建 Fiber 节点，即使它们在渲染时被裁剪掉。</p>
+<p>虚拟化的下一步是<strong>只挂载视口附近的组件</strong>，这就是 <code>hooks/useVirtualScroll.ts</code> 的工作。</p>
+<div class="mermaid-block"><div class="mermaid">graph TD
+    subgraph "虚拟滚动数据流"
+        ALL[所有消息<br/>items 数组<br/>可能 1000+ 条]
+        HOOK[useVirtualScroll]
+        RANGE[range: startIdx, endIdx<br/>只渲染约 60 条]
+    end
+
+    subgraph "ScrollBox 内容区"
+        TOP[topSpacer<br/>已裁剪区域的<br/>高度占位]
+        VISIBLE[可见消息<br/>range 范围内的<br/>约 60 条消息]
+        BOTTOM[bottomSpacer<br/>下方裁剪区域的<br/>高度占位]
+    end
+
+    subgraph "性能控制"
+        OVERSCAN[overscan: 80 行<br/>缓冲区域]
+        QUANTUM[scrollQuantum: 40 行<br/>React 更新频率]
+        SLIDE[slideStep: 25 条<br/>单次提交挂载上限]
+    end
+
+    ALL --> HOOK
+    HOOK --> RANGE
+    RANGE --> VISIBLE
+    HOOK --> TOP
+    HOOK --> BOTTOM</div></div>
+<h3 id="usevirtualscroll-的关键参数">useVirtualScroll 的关键参数</h3>
+<p>在 <code>hooks/useVirtualScroll.ts</code> 中，有几个精心调节的参数：</p>
+<pre><code class="language-typescript">const DEFAULT_ESTIMATE = 3    // 未测量项的预估高度（行数）
+const OVERSCAN_ROWS = 80      // 视口上下各多渲染的行数
+const COLD_START_COUNT = 30   // 首次渲染（无布局信息时）的项数
+const SCROLL_QUANTUM = 40     // scrollTop 量化步长
+const PESSIMISTIC_HEIGHT = 1  // 悲观假设：未测量项最小 1 行
+const MAX_MOUNTED_ITEMS = 300 // 最大挂载数量上限
+const SLIDE_STEP = 25         // 单次提交最多新增 25 项</code></pre>
+<p><strong>DEFAULT_ESTIMATE = 3</strong> 这个值偏低而非偏高，这是一个有意的非对称设计。高估会导致提前停止挂载——视口底部出现空白，因为实际高度小于预估值，挂载的总高度不够填满视口。低估只是多挂载几项进入 overscan 区域，代价是多了几次组件渲染，但不会出现空白。</p>
+<p><strong>OVERSCAN_ROWS = 80</strong> 看起来很大（终端通常只有 24-60 行），但考虑到单条消息可能有 20+ 行（长代码块、diff 输出），80 行的缓冲大约能覆盖 4-8 条消息的滚动余量。这确保了快速滚动时用户不会看到空白闪烁。</p>
+<p><strong>SCROLL_QUANTUM = 40</strong> 是一个精妙的节流机制。没有它，每次滚轮事件（一个刻度 3-5 个事件）都会触发一次 React commit + Yoga 布局 + Ink diff，造成 CPU 峰值。量化后，React 只在 scrollTop 变化超过 40 行时才重新计算挂载范围。<strong>视觉滚动不受影响</strong>——ScrollBox 通过 DOM 节点的 <code>scrollTop</code> 直接控制渲染位置，不经过 React。</p>
+<h3 id="虚拟滚动的测量机制">虚拟滚动的测量机制</h3>
+<p>虚拟滚动的核心挑战是<strong>在挂载之前知道每项的高度</strong>。在浏览器中，这通常通过 <code>ResizeObserver</code> 或预估高度解决。在终端中，高度由文本内容和终端宽度决定，必须在布局后才能精确知道。</p>
+<p>Claude Code 使用了一个 <strong>measureRef 回调机制</strong>：</p>
+<div class="mermaid-block"><div class="mermaid">sequenceDiagram
+    participant VML as VirtualMessageList
+    participant VS as useVirtualScroll
+    participant YOGA as Yoga 布局引擎
+    participant CACHE as heightCache
+
+    VML->>VS: 请求 range 和 measureRef
+    VS->>VML: range [start, end) + measureRef(key)
+    VML->>YOGA: 渲染 range 内的消息
+    YOGA->>YOGA: calculateLayout()
+    YOGA-->>VML: computedHeight for each item
+    VML->>CACHE: measureRef 写入 heightCache[key] = height
+    Note over VS,CACHE: 下次渲染时，已测量的高度用于精确计算 range
+    VML->>VS: scrollTop 变化
+    VS->>CACHE: 读取已测量的高度
+    VS->>VS: 精确计算新的 range</div></div>
+<p><code>measureRef</code> 是一个工厂函数，为每条消息创建一个回调 ref。当消息的根 Box 被 Ink 渲染后（Yoga 计算完布局），回调 ref 触发，将 Yoga 计算出的高度写入 <code>heightCache</code>。下次滚动时，已测量的消息使用精确高度，未测量的消息使用 <code>DEFAULT_ESTIMATE</code>。</p>
+<h3 id="spacer-与列表偏移">Spacer 与列表偏移</h3>
+<p>虚拟滚动需要用 Spacer（空白占位符）来维持正确的滚动条位置。<code>useVirtualScroll</code> 生成 <code>topSpacer</code> 和 <code>bottomSpacer</code> 两个高度值，分别对应视口上方和下方的未挂载消息的总高度。</p>
+<p>一个独特的设计是 <code>spacerRef</code>：它指向 topSpacer 的 Box 元素，其 Yoga 计算出的 <code>computedTop</code> 就是列表在 ScrollBox 内容区中的绝对偏移。这种&quot;让 Yoga 告诉我们偏移量&quot;的方法比手动累加高度更准确，因为它自动处理了边距、间距等布局因素。</p>
+<h2 id="offscreenfreeze不可见区域的零成本更新">OffscreenFreeze：不可见区域的零成本更新</h2>
+<h3 id="问题spinner-的蝴蝶效应">问题：Spinner 的蝴蝶效应</h3>
+<p>在虚拟滚动之外，还有一个看似简单但影响深远的性能问题。考虑以下场景：</p>
+<ol>
+<li>用户滚动了 500 行消息</li>
+<li>视口外的第 3 条消息有一个 Spinner（loading 动画），每 100ms 更新</li>
+<li>第 10 条消息有一个&quot;已用时间&quot;计时器，每秒更新</li>
+<li>第 50 条消息有一个&quot;监控中&quot;状态指示器，每 5 秒更新</li>
+</ol>
+<p>如果没有特殊处理，这些组件的每次更新都会触发 React commit → Ink diff → 终端输出。更糟糕的是，在非全屏模式（使用原生终端滚动）下，对已滚出视口的内容的任何更新都会强制 Ink 进行<strong>全帧重置</strong>（因为它无法部分更新已经滚入终端回滚缓冲区的行）。</p>
+<h3 id="解决方案offscreenfreeze">解决方案：OffscreenFreeze</h3>
+<p><code>components/OffscreenFreeze.tsx</code> 用不到 40 行代码解决了这个问题：</p>
+<pre><code class="language-typescript">export function OffscreenFreeze({ children }: Props): React.ReactNode {
+  'use no memo'  // 关键：禁用 React Compiler 的 memo
+
+  const [ref, { isVisible }] = useTerminalViewport()
+  const cached = useRef(children)
+
+  if (isVisible || inVirtualList) {
+    cached.current = children
+  }
+  return &lt;Box ref={ref}&gt;{cached.current}&lt;/Box&gt;
+}</code></pre>
+<p>原理极其巧妙：</p>
+<ol>
+<li><code>useTerminalViewport()</code> 通过 Yoga 布局信息判断组件是否在终端视口内</li>
+<li>当不可见时，<code>cached.current</code> 保持不变</li>
+<li>由于返回的是<strong>同一个 ReactElement 引用</strong>，React Reconciler 会跳过这个子树的所有更新（因为 <code>oldElement === newElement</code>）</li>
+<li><code>'use no memo'</code> 确保 React Compiler 不会 memo 这个组件——memo 化会阻止 <code>cached.current</code> 的读取逻辑工作</li>
+</ol>
+<p>这个设计的精妙之处在于它利用了 React Reconciler 的一个基本假设：<strong>如果返回值与上次相同（引用相等），则跳过子树的 diff</strong>。这不是一个 hack，而是 React 设计者有意为之的优化路径。</p>
+<div class="mermaid-block"><div class="mermaid">graph TD
+    subgraph "OffscreenFreeze 工作原理"
+        VISIBLE[可见时] --> UPDATE[cached.current = children<br/>每次更新新引用]
+        UPDATE --> RENDER[React diff 正常进行]
+
+        NOT_VISIBLE[不可见时] --> FREEZE[cached.current 不变<br/>同一 ReactElement 引用]
+        FREEZE --> SKIP[React 跳过子树 diff<br/>零渲染成本]
+    end</div></div>
+<h3 id="useterminalviewport-的实现">useTerminalViewport 的实现</h3>
+<p><code>ink/hooks/use-terminal-viewport.ts</code> 实现了视口可见性检测。它通过以下步骤计算一个元素是否在视口内：</p>
+<ol>
+<li>获取元素的 Yoga 计算高度和顶部位置</li>
+<li>沿 DOM 父链向上遍历，累加偏移</li>
+<li>遇到 ScrollBox 时减去 scrollTop</li>
+<li>判断最终位置是否在终端行数范围内</li>
+</ol>
+<p>关键设计：<strong>使用 <code>useLayoutEffect</code> 而非 <code>useEffect</code>，且不触发 setState</strong>。可见性信息存储在 ref 中，不引起额外渲染。调用方在自身重渲染时自然读取到最新值。这避免了&quot;可见性变化 → setState → 重渲染 → 可见性变化&quot;的无限循环。</p>
+<h3 id="虚拟列表中的-offscreenfreeze-行为">虚拟列表中的 OffscreenFreeze 行为</h3>
+<p>在虚拟滚动列表中，OffscreenFreeze 被<strong>禁用</strong>（通过 <code>InVirtualListContext</code>）。原因是虚拟列表已经通过 <code>useVirtualScroll</code> 控制了哪些组件被挂载——不需要二次冻结。而且在 ScrollBox 内部，<code>useTerminalViewport</code> 的可见性计算可能与虚拟滚动位置不一致，导致误判。</p>
+<h2 id="渲染管线中的性能优化">渲染管线中的性能优化</h2>
+<h3 id="脏标记传播与-blit-跳过">脏标记传播与 Blit 跳过</h3>
+<p>在 <code>ink/render-node-to-output.ts</code> 中，每个 DOM 节点都有一个 <code>dirty</code> 标志。渲染时，如果一个节点不脏且位置没变，直接从 <code>prevScreen</code>（上一帧的 Screen 缓冲区）复制像素（blit），跳过整个子树的渲染：</p>
+<pre><code class="language-typescript">// 简化的 blit 优化逻辑
+if (!node.dirty &amp;&amp; cached &amp;&amp; cached.x === x &amp;&amp; cached.y === y
+    &amp;&amp; cached.width === width &amp;&amp; cached.height === height &amp;&amp; prevScreen) {
+  output.blit(prevScreen, fx, fy, fw, fh)  // 直接复制
+  return  // 跳过子树
+}</code></pre>
+<p>这个优化在长对话中极其有效。当 Spinner 更新时，只有 Spinner 所在的节点被标记为 dirty，其余 99% 的消息通过 blit 直接复制。</p>
+<h3 id="脏污染传播">脏污染传播</h3>
+<p>一个脏节点可能影响其兄弟节点的 blit 安全性。如果脏节点的内容溢出了它的边界（没有 <code>overflow: hidden</code>），旁边兄弟节点的缓存中可能包含脏节点的溢出内容。</p>
+<p><code>renderChildren</code> 函数用 <code>seenDirtyChild</code> 标志处理这个问题——遇到脏子节点后，后续所有兄弟都禁用 blit。但对于有 <code>overflow: hidden</code> 的裁剪容器（如 ScrollBox 内部），溢出不可能影响兄弟，所以裁剪容器内的脏子节点不会禁用外部兄弟的 blit。</p>
+<h3 id="scrollbox-的-decstbm-滚动优化">ScrollBox 的 DECSTBM 滚动优化</h3>
+<p>在 <code>ink/render-node-to-output.ts</code> 中有一个精巧的 ScrollBox 滚动优化。当 ScrollBox 的 scrollTop 变化但内容没有变化时（用户滚动了但没有新消息），渲染器会：</p>
+<ol>
+<li>从 prevScreen 复制滚动区域的像素</li>
+<li>在内存中执行行移位（<code>output.shift(top, bottom, delta)</code>）</li>
+<li>只重新渲染进入视口的新行（edge rows）</li>
+</ol>
+<p>这比重新渲染整个 ScrollBox 内容便宜得多——特别是当 ScrollBox 内有数百条消息时。</p>
+<div class="mermaid-block"><div class="mermaid">graph TD
+    subgraph "DECSTBM 快速滚动路径"
+        COPY[从 prevScreen<br/>复制视口区域] --> SHIFT[内存中行移位<br/>模拟硬件滚动]
+        SHIFT --> EDGE[只渲染边缘新行<br/>非整个视口]
+        EDGE --> RESULT[输出 ANSI SU/SD<br/>终端硬件执行滚动]
+    end
+
+    subgraph "完整渲染路径 (fallback)"
+        FULL[清空视口区域] --> RENDER[重新渲染<br/>所有可见子节点]
+        RENDER --> OUTPUT[完整 ANSI 输出]
+    end</div></div>
+<p>在某些支持 DECSTBM（Set Top and Bottom Margins）序列的终端中，滚动甚至可以由终端硬件完成——Ink 只需发送一个 <code>CSI n S</code>（Scroll Up）序列，终端自己移动行内容，零数据传输。</p>
+<h3 id="yoga-布局缓存">Yoga 布局缓存</h3>
+<p>Yoga 的 <code>calculateLayout()</code> 是每帧最昂贵的操作之一。在 <code>ink/node-cache.ts</code> 中，Ink 缓存了每个节点的布局位置。只有当节点被标记为 dirty 时才重新计算其布局。</p>
+<p><code>nodeCache</code> 存储每个节点的 <code>{x, y, width, height, top}</code>。当节点被裁剪出 ScrollBox 视口时，其缓存被清除（<code>dropSubtreeCache</code>），以避免在重新进入视口时触发过时的 clear 操作。</p>
+<h2 id="滚动排水的物理直觉">滚动排水的物理直觉</h2>
+<p>ScrollBox 的 <code>pendingScrollDelta</code> 和排水机制有一个优美的物理隐喻：<strong>惯性滚动</strong>。</p>
+<p>当用户快速滚动鼠标滚轮时，事件密集到达（每秒 20-40 个），每个事件累加到 <code>pendingScrollDelta</code>。渲染器以受控速率排水：</p>
+<ul>
+<li><strong>原生终端</strong>（iTerm2、Ghostty）：使用比例排水 <code>step = max(MIN, floor(abs * 3/4))</code>，大增量快速衰减，小增量平滑停止</li>
+<li><strong>xterm.js</strong>（VS Code）：使用自适应排水，低增量一次性排完（慢滚要即时），高增量用小步长（快滚要平滑）</li>
+</ul>
+<div class="mermaid-block"><div class="mermaid">graph LR
+    WHEEL[鼠标滚轮事件] --> ACC[pendingScrollDelta<br/>纯累加器]
+    ACC --> DRAIN{排水策略}
+    DRAIN -->|原生终端| PROP[比例排水<br/>step = max(4, abs*3/4)]
+    DRAIN -->|xterm.js| ADAPT[自适应排水<br/>小量即时/大量分步]
+    PROP --> RENDER[每帧渲染]
+    ADAPT --> RENDER</div></div>
+<p>累加器的另一个好处是<strong>方向反转自然取消</strong>。用户快速上滚然后立即下滚，<code>pendingScrollDelta</code> 先增后减，净效果可能接近零。这比每次滚动都设置一个目标位置然后动画追赶要自然得多。</p>
+<h2 id="性能监控与调优">性能监控与调优</h2>
+<h3 id="帧计时系统">帧计时系统</h3>
+<p>Ink 的 <code>frame.ts</code> 定义了详细的帧事件结构，包含每个阶段的耗时：</p>
+<pre><code class="language-typescript">type FrameEvent = {
+  durationMs: number
+  phases?: {
+    renderer: number     // DOM → yoga → screen buffer
+    diff: number         // screen diff → Patch[]
+    optimize: number     // patch merge/dedupe
+    write: number        // patches → ANSI → stdout
+    patches: number      // 变化的 patch 数量
+    yoga: number         // calculateLayout() 耗时
+    commit: number       // React reconcile 耗时
+    yogaVisited: number  // Yoga 节点访问次数
+    yogaMeasured: number // 文本测量次数（最昂贵）
+  }
+}</code></pre>
+<p>这个计时系统使得性能瓶颈可以被精确诊断。例如，如果 <code>yogaMeasured</code> 值突然升高，说明有大量新文本被测量（可能是新的消息挂载），需要检查虚拟滚动的 range 计算是否过于激进。</p>
+<h3 id="commitlog-调试工具">COMMIT_LOG 调试工具</h3>
+<p><code>ink/reconciler.ts</code> 中有一个条件编译的 COMMIT_LOG 系统，当设置 <code>CLAUDE_CODE_COMMIT_LOG</code> 环境变量时，会记录每次 React commit 的详细信息：</p>
+<ul>
+<li>commit 间隔（gap）——如果超过 30ms 说明有掉帧</li>
+<li>React reconcile 时间——如果超过 20ms 说明组件树太重</li>
+<li>createInstance 次数——如果超过 50 说明有大量新节点挂载</li>
+<li>Yoga 布局时间——如果超过 20ms 说明布局计算是瓶颈</li>
+</ul>
+<h3 id="yoga-计数器">Yoga 计数器</h3>
+<p><code>ink/reconciler.ts</code> 还集成了 Yoga 的计数器系统（<code>getYogaCounters</code>），追踪：</p>
+<ul>
+<li><code>visited</code>：递归访问的 Yoga 节点总数</li>
+<li><code>measured</code>：调用 measureFunc 的次数（文本测量）</li>
+<li><code>cacheHits</code>：缓存命中次数</li>
+<li><code>live</code>：当前存活的 Yoga 节点数</li>
+</ul>
+<p>这些计数器帮助诊断布局性能问题。例如，如果 <code>measured</code> 值很高但 <code>cacheHits</code> 很低，说明文本缓存失效了，可能是因为终端宽度频繁变化（如 tmux 分屏）。</p>
+<h2 id="设计启示">设计启示</h2>
+<h3 id="终端应用的性能模型与-web-不同">终端应用的性能模型与 Web 不同</h3>
+<p>Web 应用的性能瓶颈通常是 DOM 操作和重绘。终端应用的瓶颈是 <strong>stdout 带宽和同步渲染</strong>。这意味着：</p>
+<ol>
+<li>每个 ANSI 转义序列都有成本（尤其是通过 SSH/tmux）</li>
+<li>渲染是同步的——一帧的渲染时间直接影响事件循环</li>
+<li>没有浏览器的 requestIdleCallback 来利用空闲时间</li>
+</ol>
+<p>这些差异决定了终端应用的性能优化方向：最小化 diff 输出、利用终端硬件能力（DECSTBM）、严格控制每帧工作量。</p>
+<h3 id="虚拟滚动不是-web-专属">虚拟滚动不是 Web 专属</h3>
+<p>终端虚拟滚动的核心思路与 Web 相同——只渲染可见区域。但实现细节完全不同：没有 DOM、没有 CSS <code>overflow: hidden</code>、没有 <code>IntersectionObserver</code>。Claude Code 通过 Yoga 布局 + DOM 节点遍历 + ref 回调实现了等效能力，证明虚拟滚动是一个与渲染目标无关的通用优化模式。</p>
+<h3 id="防御性设计pessimisticheight-的哲学">防御性设计：PESSIMISTIC_HEIGHT 的哲学</h3>
+<p><code>PESSIMISTIC_HEIGHT = 1</code> 的选择体现了一个重要的设计哲学：<strong>宁可多渲染一点，也不要出现空白</strong>。在虚拟滚动中，空白是最严重的 UX 缺陷——用户会以为内容加载失败。多渲染几条消息只是增加了少量 CPU 成本，但保证了视觉完整性。这种&quot;宁多勿缺&quot;的非对称错误偏好在 UI 性能优化中是通用原则。</p>
+<h3 id="利用框架的隐式契约">利用框架的隐式契约</h3>
+<p>OffscreenFreeze 利用 React 的&quot;相同引用跳过 diff&quot;这个隐式契约，实现了零成本冻结。这不是一个 hack，而是对框架语义的深刻理解。类似的模式在 Web 开发中也存在（如 <code>useMemo</code> 返回相同引用避免子树重渲染），但 OffscreenFreeze 将其推向了极致——通过 ref 缓存整个子树的渲染结果，完全绕过了 React 的 diff 机制。这种&quot;理解框架内核，然后巧妙利用&quot;的能力，是高级架构设计的标志。</p>
+          
+    <div class="pager">
+      <a href="ch33.html">上一页：输入系统——用户如何与 Agent 交互</a>
+      <a href="ch35.html">下一页：命令系统——可插拔的命令架构</a>
+    </div>
+  
+        </article>
+        <aside class="page-toc"><h2>本页导航</h2><ul><li class="toc-level-2"><a href="#设计之问终端也需要虚拟滚动吗">设计之问：终端也需要虚拟滚动吗？</a></li>
+<li class="toc-level-2"><a href="#虚拟滚动的核心算法">虚拟滚动的核心算法</a></li>
+<li class="toc-level-3"><a href="#从-scrollbox-到虚拟化">从 ScrollBox 到虚拟化</a></li>
+<li class="toc-level-3"><a href="#usevirtualscroll-的关键参数">useVirtualScroll 的关键参数</a></li>
+<li class="toc-level-3"><a href="#虚拟滚动的测量机制">虚拟滚动的测量机制</a></li>
+<li class="toc-level-3"><a href="#spacer-与列表偏移">Spacer 与列表偏移</a></li>
+<li class="toc-level-2"><a href="#offscreenfreeze不可见区域的零成本更新">OffscreenFreeze：不可见区域的零成本更新</a></li>
+<li class="toc-level-3"><a href="#问题spinner-的蝴蝶效应">问题：Spinner 的蝴蝶效应</a></li>
+<li class="toc-level-3"><a href="#解决方案offscreenfreeze">解决方案：OffscreenFreeze</a></li>
+<li class="toc-level-3"><a href="#useterminalviewport-的实现">useTerminalViewport 的实现</a></li>
+<li class="toc-level-3"><a href="#虚拟列表中的-offscreenfreeze-行为">虚拟列表中的 OffscreenFreeze 行为</a></li>
+<li class="toc-level-2"><a href="#渲染管线中的性能优化">渲染管线中的性能优化</a></li>
+<li class="toc-level-3"><a href="#脏标记传播与-blit-跳过">脏标记传播与 Blit 跳过</a></li>
+<li class="toc-level-3"><a href="#脏污染传播">脏污染传播</a></li>
+<li class="toc-level-3"><a href="#scrollbox-的-decstbm-滚动优化">ScrollBox 的 DECSTBM 滚动优化</a></li>
+<li class="toc-level-3"><a href="#yoga-布局缓存">Yoga 布局缓存</a></li>
+<li class="toc-level-2"><a href="#滚动排水的物理直觉">滚动排水的物理直觉</a></li>
+<li class="toc-level-2"><a href="#性能监控与调优">性能监控与调优</a></li>
+<li class="toc-level-3"><a href="#帧计时系统">帧计时系统</a></li>
+<li class="toc-level-3"><a href="#commitlog-调试工具">COMMIT_LOG 调试工具</a></li>
+<li class="toc-level-3"><a href="#yoga-计数器">Yoga 计数器</a></li>
+<li class="toc-level-2"><a href="#设计启示">设计启示</a></li>
+<li class="toc-level-3"><a href="#终端应用的性能模型与-web-不同">终端应用的性能模型与 Web 不同</a></li>
+<li class="toc-level-3"><a href="#虚拟滚动不是-web-专属">虚拟滚动不是 Web 专属</a></li>
+<li class="toc-level-3"><a href="#防御性设计pessimisticheight-的哲学">防御性设计：PESSIMISTIC_HEIGHT 的哲学</a></li>
+<li class="toc-level-3"><a href="#利用框架的隐式契约">利用框架的隐式契约</a></li></ul></aside>
+      </main>
+    </div>
+  </body>
+</html>

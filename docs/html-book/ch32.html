@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>第 32 章：消息渲染——从 AI 输出到终端显示</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="assets/style.css" />
+    <script src="assets/mermaid.min.js"></script>
+    <script src="assets/book.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar"><a class="book-home" href="index.html">目录</a><ul><li><a href="ch01.html">一次请求的完整旅程</a></li>
+<li><a href="ch02.html">架构分层与模块划分</a></li>
+<li><a href="ch03.html">核心设计原则</a></li>
+<li><a href="ch04.html">技术选型与权衡</a></li>
+<li><a href="ch05.html">Agentic Loop——Agent 的心脏</a></li>
+<li><a href="ch06.html">流式响应架构</a></li>
+<li><a href="ch07.html">工具调度与并发执行</a></li>
+<li><a href="ch08.html">Plan Mode——思考与行动的分离</a></li>
+<li><a href="ch09.html">QueryEngine——查询编排器</a></li>
+<li><a href="ch10.html">上下文窗口——Agent 最稀缺的资源</a></li>
+<li><a href="ch11.html">上下文组装——给 Agent 看什么</a></li>
+<li><a href="ch12.html">上下文压缩与摘要（Compact）</a></li>
+<li><a href="ch13.html">跨会话记忆（SessionMemory）</a></li>
+<li><a href="ch14.html">工具架构——统一接口与注册表</a></li>
+<li><a href="ch15.html">文件操作工具的设计哲学</a></li>
+<li><a href="ch16.html">Shell 执行——Agent 最危险的工具</a></li>
+<li><a href="ch17.html">搜索工具——让 Agent 找到信息</a></li>
+<li><a href="ch18.html">子 Agent 调度——AgentTool 与任务委派</a></li>
+<li><a href="ch19.html">MCP——开放的工具协议</a></li>
+<li><a href="ch20.html">权限模型——信任与控制</a></li>
+<li><a href="ch21.html">权限的运行时执行</a></li>
+<li><a href="ch22.html">沙箱——Agent 的活动围栏</a></li>
+<li><a href="ch23.html">安全设计总结——纵深防御</a></li>
+<li><a href="ch24.html">Swarm——多 Agent 协调架构</a></li>
+<li><a href="ch25.html">Worktree——并行工作流</a></li>
+<li><a href="ch26.html">Teleport——远程协作</a></li>
+<li><a href="ch27.html">后台任务与异步执行</a></li>
+<li><a href="ch28.html">全局状态设计</a></li>
+<li><a href="ch29.html">状态变更与响应式更新</a></li>
+<li><a href="ch30.html">对话历史的持久化与恢复</a></li>
+<li><a href="ch31.html">React 在终端——Ink 框架的设计</a></li>
+<li class="active"><a href="ch32.html">消息渲染——从 AI 输出到终端显示</a></li>
+<li><a href="ch33.html">输入系统——用户如何与 Agent 交互</a></li>
+<li><a href="ch34.html">虚拟滚动与渲染性能</a></li>
+<li><a href="ch35.html">命令系统——可插拔的命令架构</a></li>
+<li><a href="ch36.html">插件系统——第三方扩展机制</a></li>
+<li><a href="ch37.html">技能系统（Skills）</a></li>
+<li><a href="ch38.html">Feature Flag 与渐进式发布</a></li>
+<li><a href="ch39.html">错误处理与重试策略</a></li>
+<li><a href="ch40.html">成本控制与速率限制</a></li>
+<li><a href="ch41.html">OAuth 与认证架构</a></li>
+<li><a href="ch42.html">可观测性——日志、遥测与诊断</a></li>
+<li><a href="ch43.html">启动流程——从命令行到 Agent 就绪</a></li>
+<li><a href="ch44.html">应用状态机——从引导到就绪</a></li>
+<li><a href="ch45.html">架构模式总结与启示</a></li></ul></nav>
+      <main class="content">
+        <article class="article">
+          <h1 id="第-32-章消息渲染从-ai-输出到终端显示">第 32 章：消息渲染——从 AI 输出到终端显示</h1>
+<h2 id="设计之问流式文本如何在终端中美观地呈现">设计之问：流式文本如何在终端中美观地呈现？</h2>
+<p>AI Agent 的核心用户体验可以用一句话概括：<strong>用户发送消息，AI 的回复逐步&quot;流&quot;出来，同时工具调用实时展示状态，整个过程行云流水</strong>。但&quot;流出来&quot;这三个字背后，隐藏着一系列复杂的工程挑战。</p>
+<p>AI 的回复不是一段静态文本。它以 token 为单位逐个到达（每秒约 30-60 个 token），可能是 Markdown 格式、包含代码块、列表、表格，甚至还有行内工具调用的状态更新。在终端环境中，流式渲染面临三个独特难题：</p>
+<ol>
+<li><strong>格式连续性</strong>：Markdown 的代码块需要 <code> </code>`<code> </code> 包裹，但 token 到达时我们不知道后面是否还有更多内容。如果过早闭合代码块，用户会看到格式闪烁。</li>
+<li><strong>终端宽度限制</strong>：终端的列宽是固定的（通常 80-120 列），文本必须正确换行，而且宽字符（中文、emoji）占 2 列。</li>
+<li><strong>样式叠加</strong>：语法高亮需要 ANSI 转义序列，但多个转义序列在换行边界上的行为极其脆弱。</li>
+</ol>
+<p>Claude Code 的消息渲染系统通过精心设计的组件层级和缓存策略解决了这些问题。</p>
+<h2 id="消息类型的组件层级">消息类型的组件层级</h2>
+<h3 id="从消息到组件的映射">从消息到组件的映射</h3>
+<p>Claude Code 处理的消息类型远比&quot;一段文本&quot;复杂。在 <code>components/Message.tsx</code> 中，一个 <code>Message</code> 组件根据消息类型分发到不同的渲染组件：</p>
+<div class="mermaid-block"><div class="mermaid">graph TD
+    MSG[Message 组件] --> TYPE{message.type?}
+    TYPE -->|assistant| ASSISTANT[AssistantMessage]
+    TYPE -->|user| USER[UserTextMessage]
+    TYPE -->|attachment| ATTACH[AttachmentMessage]
+    TYPE -->|system| SYS[SystemTextMessage]
+    TYPE -->|grouped_tool_use| GROUP[GroupedToolUseContent]
+    TYPE -->|collapsed_read_search| COLLAPSED[CollapsedReadSearchContent]
+
+    ASSISTANT --> TEXT[AssistantTextMessage]
+    ASSISTANT --> THINK[AssistantThinkingMessage]
+    ASSISTANT --> TOOL[AssistantToolUseMessage]
+    ASSISTANT --> REDACTED[AssistantRedactedThinkingMessage]
+    ASSISTANT --> ADVISOR[AdvisorMessage]</div></div>
+<p>这种分层设计遵循了一个重要原则：<strong>消息的渲染逻辑应该与消息的数据结构解耦</strong>。同样的&quot;助手消息&quot;可能包含文本块、思考块和工具调用块，每种块的渲染方式完全不同。通过将每种内容类型抽象为独立的 React 组件，系统获得了极大的灵活性。</p>
+<h3 id="assistanttextmessage最核心的渲染组件">AssistantTextMessage：最核心的渲染组件</h3>
+<p>在 <code>components/messages/AssistantTextMessage.tsx</code> 中，AI 的文本回复被包裹在 <code>&lt;MessageResponse&gt;</code> 和 <code>&lt;Markdown&gt;</code> 组件中：</p>
+<pre><code class="language-typescript">// 简化的渲染逻辑
+&lt;MessageResponse&gt;
+  &lt;Box flexDirection=&quot;column&quot;&gt;
+    &lt;Markdown&gt;{text}&lt;/Markdown&gt;
+  &lt;/Box&gt;
+&lt;/MessageResponse&gt;</code></pre>
+<p>看似简单，但这里的每一层都有其存在的理由：</p>
+<ul>
+<li><strong>MessageResponse</strong> 提供消息级别的交互能力（展开/折叠、复制、操作菜单）</li>
+<li><strong>Box</strong> 提供布局容器，确保文本宽度受限</li>
+<li><strong>Markdown</strong> 负责将 Markdown 文本渲染为 ANSI 格式的终端输出</li>
+</ul>
+<h2 id="markdown-渲染引擎">Markdown 渲染引擎</h2>
+<h3 id="解析与缓存策略">解析与缓存策略</h3>
+<p><code>components/Markdown.tsx</code> 是消息渲染系统中技术密度最高的组件之一。它使用 <code>marked</code> 库将 Markdown 解析为 token 树，然后通过 <code>formatToken</code> 将 token 转换为 ANSI 字符串。</p>
+<p>这里有一个关键的性能优化——<strong>模块级 token 缓存</strong>：</p>
+<pre><code class="language-typescript">const TOKEN_CACHE_MAX = 500
+const tokenCache = new Map&lt;string, Token[]&gt;()
+
+function cachedLexer(content: string): Token[] {
+  // 快速路径：无 Markdown 语法的纯文本
+  if (!hasMarkdownSyntax(content)) {
+    return [{ type: 'paragraph', raw: content, text: content }]
+  }
+  // LRU 缓存查询
+  const key = hashContent(content)
+  const hit = tokenCache.get(key)
+  if (hit) {
+    tokenCache.delete(key)
+    tokenCache.set(key, hit) // 提升到 MRU
+    return hit
+  }
+  // 解析并缓存
+  const tokens = marked.lexer(content)
+  tokenCache.set(key, tokens)
+  return tokens
+}</code></pre>
+<p>为什么用 <code>Map</code> 做缓存而不是 <code>useMemo</code>？因为虚拟滚动场景下，组件会被卸载再重新挂载，<code>useMemo</code> 的缓存在卸载时丢失。而 <code>Map</code> 是模块级的，跨组件生命周期持久存在。在长对话中滚动回到之前看过的消息时，缓存命中可以节省约 3ms/条 的解析时间。</p>
+<p>更有趣的是 <code>hasMarkdownSyntax</code> 快速路径。大多数 AI 短回复和用户提示都是纯文本，不含 <code>#</code>、`<code> </code> `<code>、</code>*<code>、</code>[` 等 Markdown 标记。通过正则采样前 500 个字符检测这些标记，纯文本直接跳过整个解析流程。</p>
+<h3 id="语法高亮的-suspense-边界">语法高亮的 Suspense 边界</h3>
+<div class="mermaid-block"><div class="mermaid">graph TD
+    MD[Markdown 组件] --> DISABLED{语法高亮<br/>已禁用?}
+    DISABLED -->|是| BODY[MarkdownBody<br/>无高亮]
+    DISABLED -->|否| SUSPENSE[React.Suspense]
+    SUSPENSE --> FALLBACK[MarkdownBody<br/>高亮=null 兜底]
+    SUSPENSE --> ASYNC[MarkdownWithHighlight<br/>异步加载高亮器]
+    ASYNC --> HIGHLIGHT[MarkdownBody<br/>带高亮]
+
+    subgraph "MarkdownBody 内部"
+        LEXER[cachedLexer<br/>解析 Markdown] --> TOKENS[Token 列表]
+        TOKENS --> LOOP{遍历 Token}
+        LOOP --> TABLE[MarkdownTable<br/>表格组件]
+        LOOP --> CODE[formatToken<br/>代码块高亮]
+        LOOP --> TEXT_BLOCK[文本渲染<br/>加粗/斜体/链接]
+    end</div></div>
+<p>语法高亮器的加载是异步的（<code>getCliHighlightPromise</code>），Markdown 组件使用 <code>React.Suspense</code> 来处理这个异步过程。在等待高亮器加载时，先用无高亮版本渲染，加载完成后自动切换。这种模式确保了用户不会因为高亮器加载慢而看到空白屏幕。</p>
+<h3 id="流式渲染的挑战与策略">流式渲染的挑战与策略</h3>
+<p>AI 的回复是逐 token 流入的。这意味着 Markdown 组件接收到的 <code>children</code> 字符串在持续增长。每次增长都触发重新解析和重新渲染。这里有三个关键的工程决策：</p>
+<p><strong>1. 增量解析而非全量重解析</strong></p>
+<p>虽然 <code>marked.lexer</code> 是全量解析（从字符串开头到末尾），但由于 token 缓存的存在，只有内容确实变化时才重新解析。流式到达时内容确实在变化，但缓存的 key 是内容哈希，所以同一内容不会重复解析。</p>
+<p><strong>2. 不完整的 Markdown 处理</strong></p>
+<p>流式到达的一个特殊情况：可能当前文本以 ```<code> </code>`<code>py</code> 结尾，代码块尚未闭合。<code>marked</code> 在这种情况下的行为是不确定的——它可能把未闭合的代码块当作普通文本。Claude Code 通过 <code>StreamingMarkdown</code> 组件（在 <code>components/Markdown.tsx</code> 中）处理这个问题，在流式渲染时添加适当的补全。</p>
+<p><strong>3. 表格的特殊处理</strong></p>
+<p>Markdown 表格在终端中的渲染非常特殊。等宽字体使得精确对齐成为可能，但也要求精确计算每列的宽度。<code>components/MarkdownTable.tsx</code> 使用 Ink 的 <code>&lt;Box&gt;</code> 组件以 Flexbox 布局来渲染表格，而非传统的字符拼接。这确保了表格在终端宽度变化时能正确重排。</p>
+<h2 id="消息渲染管线全景">消息渲染管线全景</h2>
+<div class="mermaid-block"><div class="mermaid">graph LR
+    subgraph "数据层"
+        API[API Streaming] --> RAW[Raw Message]
+        RAW --> NORM[Normalized Messages<br/>collapseReadSearch<br/>groupToolUses]
+    end
+
+    subgraph "组件层"
+        NORM --> MSGS[Messages 组件]
+        MSGS --> ROWS[MessageRow 列表]
+        ROWS --> MSG[Message 组件]
+        MSG --> MD[Markdown 组件]
+        MSG --> TOOL[ToolUseMessage]
+        MSG --> THINK[ThinkingMessage]
+    end
+
+    subgraph "渲染层"
+        MD --> LEXER[marked.lexer]
+        LEXER --> FORMAT[formatToken → ANSI]
+        FORMAT --> INK_TEXT[ink-text DOM 节点]
+        INK_TEXT --> YOGA[Yoga 布局]
+        YOGA --> SCREEN[Screen 缓冲区]
+        SCREEN --> DIFF[Diff → ANSI 输出]
+    end</div></div>
+<h3 id="消息标准化">消息标准化</h3>
+<p>在 <code>components/Messages.tsx</code> 中，原始消息经过多层变换才到达渲染层：</p>
+<ol>
+<li><strong>normalizeMessages</strong>：将 API 返回的原始消息标准化为统一的 <code>NormalizedMessage</code> 类型</li>
+<li><strong>collapseReadSearchGroups</strong>：将连续的文件读取和搜索操作折叠为可展开的分组</li>
+<li><strong>collapseHookSummaries</strong>：折叠 hook 执行摘要</li>
+<li><strong>collapseBackgroundBashNotifications</strong>：折叠后台 bash 通知</li>
+<li><strong>applyGrouping</strong>：将工具调用按逻辑关系分组</li>
+</ol>
+<p>每一层折叠都服务于同一个目标：<strong>减少视觉噪音，让用户聚焦于重要信息</strong>。一个典型的 AI Agent 交互可能触发 10+ 次文件读取，如果全部展开显示，用户很难找到关键内容。</p>
+<h3 id="工具调用的状态渲染">工具调用的状态渲染</h3>
+<p>工具调用（ToolUse）的渲染是 Agent 界面区别于普通聊天界面的核心。在 <code>components/messages/AssistantToolUseMessage.tsx</code> 中，每个工具调用有多个状态：</p>
+<div class="mermaid-block"><div class="mermaid">stateDiagram-v2
+    [*] --> InProgress: 开始执行
+    InProgress --> Completed: 执行成功
+    InProgress --> Rejected: 用户拒绝
+    InProgress --> Error: 执行失败
+    Completed --> [*]
+    Rejected --> [*]
+    Error --> [*]</div></div>
+<p>每个状态的渲染方式不同：</p>
+<ul>
+<li><strong>InProgress</strong>：显示 Spinner + 工具名称 + 参数摘要</li>
+<li><strong>Completed</strong>：显示工具结果（代码 diff、文件内容、命令输出等）</li>
+<li><strong>Rejected</strong>：显示用户拒绝的原因</li>
+<li><strong>Error</strong>：显示错误信息</li>
+</ul>
+<p>工具结果的渲染尤其复杂。文件编辑操作需要展示 diff 视图（<code>components/FileEditToolDiff.tsx</code>、<code>components/StructuredDiff.tsx</code>），bash 命令需要展示终端输出，MCP 工具调用的结果格式则完全取决于工具本身。</p>
+<h3 id="思考过程的渲染">思考过程的渲染</h3>
+<p>Claude 的&quot;thinking&quot;（扩展思考）块在 UI 中有两种状态：</p>
+<ul>
+<li><strong>Thinking（进行中）</strong>：<code>components/messages/AssistantThinkingMessage.tsx</code> 显示一个脉动的思考指示器</li>
+<li><strong>Redacted Thinking（已编辑）</strong>：<code>components/messages/AssistantRedactedThinkingMessage.tsx</code> 显示一段摘要</li>
+</ul>
+<p>思考块的渲染有一个独特的挑战：它可能非常长（数千 token），但在界面上应该折叠显示。OffscreenFreeze（下一章详述）确保不可见的思考块不消耗渲染资源。</p>
+<h2 id="markdown-到-ansi-的转化细节">Markdown 到 ANSI 的转化细节</h2>
+<h3 id="formattoken-的设计">formatToken 的设计</h3>
+<p><code>utils/markdown.ts</code> 中的 <code>formatToken</code> 函数是 Markdown 到 ANSI 转化的核心。它将 <code>marked</code> 解析出的每个 token 转化为带 ANSI 样式的字符串：</p>
+<ul>
+<li><strong>加粗</strong>：使用 ANSI bold 序列 (<code>\x1b[1m</code>)</li>
+<li><strong>斜体</strong>：使用 ANSI italic 序列 (<code>\x1b[3m</code>)</li>
+<li><strong>代码</strong>：使用 ANSI 背景色模拟代码块</li>
+<li><strong>链接</strong>：使用 OSC 8 超链接协议（如果终端支持）</li>
+<li><strong>标题</strong>：使用 ANSI bold + 下划线</li>
+</ul>
+<h3 id="代码块的语法高亮">代码块的语法高亮</h3>
+<p>代码块的语法高亮使用了一个异步加载的高亮器（<code>utils/cliHighlight.ts</code>）。高亮器将代码文本转化为带 ANSI 颜色序列的字符串，每个 token（关键字、字符串、注释、标识符等）都有对应的颜色。</p>
+<p>在 <code>ink/render-node-to-output.ts</code> 中，高亮后的代码块通过 <code>ink-text</code> 节点渲染。文本节点的渲染包含以下步骤：</p>
+<ol>
+<li><strong>squashTextNodes</strong>：将相邻的文本节点合并为样式段（StyledSegment）</li>
+<li><strong>wrapText</strong>：按终端宽度自动换行</li>
+<li><strong>applyTextStyles</strong>：将样式转化为 ANSI 转义序列</li>
+<li><strong>output.write</strong>：写入到 Screen 缓冲区</li>
+</ol>
+<h3 id="osc-8-超链接">OSC 8 超链接</h3>
+<p>一个容易被忽视的细节是 OSC 8 超链接支持。在 <code>ink/render-node-to-output.ts</code> 中，链接文本被包裹在 OSC 8 序列中：</p>
+<pre><code class="language-typescript">function wrapWithOsc8Link(text: string, url: string): string {
+  return `${OSC}8;;${url}${BEL}${text}${OSC}8;;${BEL}`
+}</code></pre>
+<p>这使得在支持 OSC 8 的终端（iTerm2、Ghostty、VS Code 终端等）中，Markdown 链接可以被点击。不支持的终端会忽略 OSC 序列，显示为普通文本。</p>
+<h2 id="流式渲染中的性能考量">流式渲染中的性能考量</h2>
+<h3 id="避免每-token-一次重绘">避免每 token 一次重绘</h3>
+<p>AI 的回复以约 50 token/秒的速度流入。如果每个 token 都触发一次完整的组件重渲染和终端重绘，性能会严重下降。Claude Code 通过以下策略缓解：</p>
+<ol>
+<li><strong>节流渲染</strong>：Ink 实例的 <code>onRender</code> 回调有内置的节流（<code>FRAME_INTERVAL_MS</code>），不会比这个间隔更快地渲染</li>
+<li><strong>React 批量更新</strong>：React 19 的自动批量更新使得多个 state 变化合并为一次 commit</li>
+<li><strong>Markdown 缓存</strong>：token 缓存确保相同内容不会重复解析</li>
+</ol>
+<h3 id="spinner-的动画不影响消息">Spinner 的动画不影响消息</h3>
+<p>底部 Spinner 的 100ms 更新是一个常见的性能陷阱。如果 Spinner 的更新导致整个消息列表重新渲染，性能会急剧下降。Claude Code 通过以下机制隔离 Spinner 的影响：</p>
+<ul>
+<li><strong>OffscreenFreeze</strong>：不可见的消息（滚出视口的）不参与重渲染</li>
+<li><strong>Blit 优化</strong>：未变化的节点直接从 prevScreen 复制</li>
+<li><strong>React.memo</strong>：消息组件通过 memo 避免不必要的重渲染</li>
+</ul>
+<h2 id="设计启示">设计启示</h2>
+<h3 id="分层是管理复杂度的唯一手段">分层是管理复杂度的唯一手段</h3>
+<p>消息渲染系统的复杂性来源有三：消息类型的多样性、流式更新的实时性、终端渲染的特殊性。Claude Code 的解决方案是将这三个关注点分层处理——数据标准化层处理多样性，React 组件层处理实时性，Ink 渲染层处理终端特殊性。</p>
+<h3 id="缓存策略必须匹配使用模式">缓存策略必须匹配使用模式</h3>
+<p>Markdown token 缓存使用模块级 Map 而非 React 的 useMemo，这个选择完全由虚拟滚动的使用模式决定。组件会频繁卸载/重新挂载，useMemo 的缓存会在卸载时丢失，而模块级 Map 则持久存在。缓存策略必须建立在对使用模式的深刻理解之上。</p>
+<h3 id="渐进式渲染优于一次性渲染">渐进式渲染优于一次性渲染</h3>
+<p>Suspense 包裹语法高亮、流式 Markdown 渲染先显示文本再应用格式、工具调用先显示状态再显示结果——所有这些都体现了同一个原则：<strong>先给用户看一点东西，再逐步完善</strong>。在网络延迟和计算延迟都不可预测的环境中，这种策略显著改善了感知性能。</p>
+          
+    <div class="pager">
+      <a href="ch31.html">上一页：React 在终端——Ink 框架的设计</a>
+      <a href="ch33.html">下一页：输入系统——用户如何与 Agent 交互</a>
+    </div>
+  
+        </article>
+        <aside class="page-toc"><h2>本页导航</h2><ul><li class="toc-level-2"><a href="#设计之问流式文本如何在终端中美观地呈现">设计之问：流式文本如何在终端中美观地呈现？</a></li>
+<li class="toc-level-2"><a href="#消息类型的组件层级">消息类型的组件层级</a></li>
+<li class="toc-level-3"><a href="#从消息到组件的映射">从消息到组件的映射</a></li>
+<li class="toc-level-3"><a href="#assistanttextmessage最核心的渲染组件">AssistantTextMessage：最核心的渲染组件</a></li>
+<li class="toc-level-2"><a href="#markdown-渲染引擎">Markdown 渲染引擎</a></li>
+<li class="toc-level-3"><a href="#解析与缓存策略">解析与缓存策略</a></li>
+<li class="toc-level-3"><a href="#语法高亮的-suspense-边界">语法高亮的 Suspense 边界</a></li>
+<li class="toc-level-3"><a href="#流式渲染的挑战与策略">流式渲染的挑战与策略</a></li>
+<li class="toc-level-2"><a href="#消息渲染管线全景">消息渲染管线全景</a></li>
+<li class="toc-level-3"><a href="#消息标准化">消息标准化</a></li>
+<li class="toc-level-3"><a href="#工具调用的状态渲染">工具调用的状态渲染</a></li>
+<li class="toc-level-3"><a href="#思考过程的渲染">思考过程的渲染</a></li>
+<li class="toc-level-2"><a href="#markdown-到-ansi-的转化细节">Markdown 到 ANSI 的转化细节</a></li>
+<li class="toc-level-3"><a href="#formattoken-的设计">formatToken 的设计</a></li>
+<li class="toc-level-3"><a href="#代码块的语法高亮">代码块的语法高亮</a></li>
+<li class="toc-level-3"><a href="#osc-8-超链接">OSC 8 超链接</a></li>
+<li class="toc-level-2"><a href="#流式渲染中的性能考量">流式渲染中的性能考量</a></li>
+<li class="toc-level-3"><a href="#避免每-token-一次重绘">避免每 token 一次重绘</a></li>
+<li class="toc-level-3"><a href="#spinner-的动画不影响消息">Spinner 的动画不影响消息</a></li>
+<li class="toc-level-2"><a href="#设计启示">设计启示</a></li>
+<li class="toc-level-3"><a href="#分层是管理复杂度的唯一手段">分层是管理复杂度的唯一手段</a></li>
+<li class="toc-level-3"><a href="#缓存策略必须匹配使用模式">缓存策略必须匹配使用模式</a></li>
+<li class="toc-level-3"><a href="#渐进式渲染优于一次性渲染">渐进式渲染优于一次性渲染</a></li></ul></aside>
+      </main>
+    </div>
+  </body>
+</html>

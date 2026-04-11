@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>第 43 章：启动流程——从命令行到 Agent 就绪</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="assets/style.css" />
+    <script src="assets/mermaid.min.js"></script>
+    <script src="assets/book.js"></script>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="sidebar"><a class="book-home" href="index.html">目录</a><ul><li><a href="ch01.html">一次请求的完整旅程</a></li>
+<li><a href="ch02.html">架构分层与模块划分</a></li>
+<li><a href="ch03.html">核心设计原则</a></li>
+<li><a href="ch04.html">技术选型与权衡</a></li>
+<li><a href="ch05.html">Agentic Loop——Agent 的心脏</a></li>
+<li><a href="ch06.html">流式响应架构</a></li>
+<li><a href="ch07.html">工具调度与并发执行</a></li>
+<li><a href="ch08.html">Plan Mode——思考与行动的分离</a></li>
+<li><a href="ch09.html">QueryEngine——查询编排器</a></li>
+<li><a href="ch10.html">上下文窗口——Agent 最稀缺的资源</a></li>
+<li><a href="ch11.html">上下文组装——给 Agent 看什么</a></li>
+<li><a href="ch12.html">上下文压缩与摘要（Compact）</a></li>
+<li><a href="ch13.html">跨会话记忆（SessionMemory）</a></li>
+<li><a href="ch14.html">工具架构——统一接口与注册表</a></li>
+<li><a href="ch15.html">文件操作工具的设计哲学</a></li>
+<li><a href="ch16.html">Shell 执行——Agent 最危险的工具</a></li>
+<li><a href="ch17.html">搜索工具——让 Agent 找到信息</a></li>
+<li><a href="ch18.html">子 Agent 调度——AgentTool 与任务委派</a></li>
+<li><a href="ch19.html">MCP——开放的工具协议</a></li>
+<li><a href="ch20.html">权限模型——信任与控制</a></li>
+<li><a href="ch21.html">权限的运行时执行</a></li>
+<li><a href="ch22.html">沙箱——Agent 的活动围栏</a></li>
+<li><a href="ch23.html">安全设计总结——纵深防御</a></li>
+<li><a href="ch24.html">Swarm——多 Agent 协调架构</a></li>
+<li><a href="ch25.html">Worktree——并行工作流</a></li>
+<li><a href="ch26.html">Teleport——远程协作</a></li>
+<li><a href="ch27.html">后台任务与异步执行</a></li>
+<li><a href="ch28.html">全局状态设计</a></li>
+<li><a href="ch29.html">状态变更与响应式更新</a></li>
+<li><a href="ch30.html">对话历史的持久化与恢复</a></li>
+<li><a href="ch31.html">React 在终端——Ink 框架的设计</a></li>
+<li><a href="ch32.html">消息渲染——从 AI 输出到终端显示</a></li>
+<li><a href="ch33.html">输入系统——用户如何与 Agent 交互</a></li>
+<li><a href="ch34.html">虚拟滚动与渲染性能</a></li>
+<li><a href="ch35.html">命令系统——可插拔的命令架构</a></li>
+<li><a href="ch36.html">插件系统——第三方扩展机制</a></li>
+<li><a href="ch37.html">技能系统（Skills）</a></li>
+<li><a href="ch38.html">Feature Flag 与渐进式发布</a></li>
+<li><a href="ch39.html">错误处理与重试策略</a></li>
+<li><a href="ch40.html">成本控制与速率限制</a></li>
+<li><a href="ch41.html">OAuth 与认证架构</a></li>
+<li><a href="ch42.html">可观测性——日志、遥测与诊断</a></li>
+<li class="active"><a href="ch43.html">启动流程——从命令行到 Agent 就绪</a></li>
+<li><a href="ch44.html">应用状态机——从引导到就绪</a></li>
+<li><a href="ch45.html">架构模式总结与启示</a></li></ul></nav>
+      <main class="content">
+        <article class="article">
+          <h1 id="第-43-章启动流程从命令行到-agent-就绪">第 43 章：启动流程——从命令行到 Agent 就绪</h1>
+<h2 id="cli-工具为什么必须在瞬间启动">CLI 工具为什么必须在&quot;瞬间&quot;启动</h2>
+<p>终端用户的心理模型是命令式的：输入命令，立刻看到结果。Git 的 <code>--version</code> 在 50ms 内返回，<code>ls</code> 几乎不花时间。如果一个 CLI 工具启动需要 1 秒以上，用户就会觉得&quot;卡&quot;。这个感知阈值对于交互式 Agent 尤为致命——用户期望 <code>claude</code> 命令像 <code>git</code> 一样秒开，而不是像 IDE 一样加载进度条。</p>
+<p>Claude Code 的启动路径承载了远超普通 CLI 的复杂度：需要检查 Node.js 版本、加载配置、初始化插件系统、建立 MCP 连接、预取 API Key、启动 UDS 消息服务器、验证权限模式、渲染 React TUI……如果这些工作全部串行完成后再显示界面，启动时间可能超过 2 秒。</p>
+<p>设计者的核心策略是：<strong>分层启动——快速路径直接返回，慢速路径延迟加载，关键路径并行执行</strong>。下面我们逐层拆解。</p>
+<p>但仅仅把启动理解成性能问题，还不够。对于 Claude Code 这类 Agent CLI，启动其实同时承担三件事：</p>
+<ul>
+<li>建立<strong>速度感</strong>：用户要尽快看到系统活着。</li>
+<li>建立<strong>信任链</strong>：系统不能在用户确认前擅自放大权限。</li>
+<li>建立<strong>可工作性</strong>：界面一旦出现，就最好已经接近可交互。</li>
+</ul>
+<p>因此，Claude Code 优化的不是单纯的 cold start，而是 <strong>time to first safe interaction</strong>：从启动到&quot;用户可以安全开始工作&quot;的最短时间。</p>
+<h2 id="431-快速路径零负载的命令分流">43.1 快速路径：零负载的命令分流</h2>
+<p>启动的第一层是 <code>entrypoints/cli.tsx</code>。这个文件的设计哲学写在注释里：</p>
+<blockquote><p>&quot;Bootstrap entrypoint - checks for special flags before loading the full CLI. All imports are dynamic to minimize module evaluation for fast paths. Fast-path for --version has zero imports beyond this file.&quot;</p></blockquote>
+<p>最极端的快速路径是 <code>--version</code>：</p>
+<pre><code class="language-typescript">// Fast-path for --version/-v: zero module loading needed
+if (args.length === 1 &amp;&amp; (args[0] === '--version' || args[0] === '-v')) {
+  console.log(`${MACRO.VERSION} (Claude Code)`)
+  return
+}</code></pre>
+<p>这段代码在 <code>main()</code> 函数的最顶部，甚至还没有加载启动分析器（<code>startupProfiler</code>）。MACRO.VERSION 是构建时内联的常量，所以整个分支零动态导入、零模块加载、零 I/O——返回速度等于 <code>console.log</code> 的速度。</p>
+<p>其他快速路径包括：<code>--dump-system-prompt</code>（输出渲染后的系统提示词）、<code>--daemon-worker</code>（守护进程工作器）、<code>remote-control</code>（桥接模式）、<code>daemon</code>（长运行监控进程）、<code>ps|logs|attach|kill</code>（后台会话管理）、<code>new|list|reply</code>（模板任务）、<code>environment-runner</code>（BYOC 环境运行器）、<code>self-hosted-runner</code>（自托管运行器）。</p>
+<p>这些快速路径的共同设计原则是：</p>
+<ol>
+<li><strong>动态导入</strong>：每个路径只加载自己需要的模块，不触发其他路径的代码加载。</li>
+<li><strong>feature() 门控</strong>：<code>feature('DAEMON')</code>、<code>feature('BRIDGE_MODE')</code> 等标志在构建时通过死代码消除（DCE）从外部构建中完全移除，连检查逻辑都不存在。</li>
+<li><strong>尽早返回</strong>：匹配后 <code>return</code>，不进入后续的完整 CLI 初始化。</li>
+</ol>
+<div class="mermaid-block"><div class="mermaid">flowchart TD
+    A["用户输入 claude [args]"] --> B{"--version / -v?"}
+    B -->|是| C["console.log → 返回<br/>零模块加载"]
+    B -->|否| D["加载 startupProfiler"]
+    D --> E{"--dump-system-prompt?"}
+    E -->|是| F["动态导入 config + prompts → 输出 → 返回"]
+    E -->|否| G{"--daemon-worker?"}
+    G -->|是| H["动态导入 workerRegistry → 运行 → 返回"]
+    G -->|否| I{"remote-control / rc?"}
+    I -->|是| J["动态导入 bridgeMain → 运行 → 返回"]
+    I -->|否| K{"daemon / ps / bg /<br/>templates / runner ...?"}
+    K -->|匹配任一| L["动态导入对应模块 → 运行 → 返回"]
+    K -->|均不匹配| M["完整 CLI 路径<br/>加载 main.tsx"]</div></div>
+<p>这个分支结构的设计意图是：<strong>大多数非交互式调用不应该承担交互式 REPL 的启动成本</strong>。CI/CD 管道中的 <code>claude -p &quot;explain this&quot;</code> 走的是完全不同的代码路径。</p>
+<h2 id="432-关键路径并行预取与延迟初始化">43.2 关键路径：并行预取与延迟初始化</h2>
+<p>当命令行参数不匹配任何快速路径时，系统进入&quot;完整 CLI&quot;路径。这里的设计核心是 <strong>尽早启动 I/O、延后等待结果</strong>。</p>
+<p>在 <code>main.tsx</code> 文件的最顶部，有一系列&quot;副作用导入&quot;——它们在模块加载阶段就开始并行执行：</p>
+<pre><code class="language-typescript">// 副作用 1: 启动 MDM 子进程读取（macOS 设备管理）
+startMdmRawRead()  // 与后续 135ms 的模块导入并行
+
+// 副作用 2: 启动 macOS Keychain 预取（OAuth + API Key）
+startKeychainPrefetch()  // 两个 keychain 读取并行执行</code></pre>
+<p>这两个操作的耗时各约 50-100ms（子进程 + keychain I/O），但它们与模块加载过程完全重叠。到代码真正需要用到它们的值时，结果大概率已经就绪。</p>
+<p>接着，<code>cli.tsx</code> 在进入完整 CLI 之前做了一个精妙的优化——<strong>提前捕获用户输入</strong>：</p>
+<pre><code class="language-typescript">const { startCapturingEarlyInput } = await import('../utils/earlyInput.js')
+startCapturingEarlyInput()  // 开始捕获用户在启动期间键入的字符</code></pre>
+<p><code>utils/earlyInput.ts</code> 的工作原理是：在 REPL 尚未就绪时，提前将 stdin 设置为 raw mode 并开始缓冲按键。当用户在 <code>claude</code> 命令后立即开始打字时，这些字符不会丢失，而是被收集到 <code>earlyInputBuffer</code> 中。REPL 渲染后，通过 <code>consumeEarlyInput()</code> 取出缓冲的文本，预填充到输入框中。</p>
+<p>这个设计反映了一个深刻的用户体验洞察：<strong>用户不会等程序准备好才行动</strong>。</p>
+<p>这类优化看似细枝末节，实际上非常体现 Agent 产品的性质。用户面对的是一个被拟人化的执行体，而不是一个传统程序。只要它显得迟钝，用户就会把这种迟钝归因为&quot;它不够聪明&quot;。因此启动优化的目标不只是少几百毫秒，而是保护系统的整体心理形象。</p>
+<h2 id="433-setup-函数环境准备的编排器">43.3 setup() 函数：环境准备的编排器</h2>
+<p><code>setup.ts</code> 的 <code>setup()</code> 函数负责在 REPL 渲染前完成所有环境准备。它的设计遵循一个严格的优先级排序：</p>
+<div class="mermaid-block"><div class="mermaid">flowchart TD
+    subgraph setup顺序
+        A["1. Node.js 版本检查<br/>（阻塞，不通过直接退出）"] --> B["2. UDS 消息服务器启动<br/>（阻塞，确保 socket 绑定）"]
+        B --> C["3. Terminal 备份恢复<br/>（仅交互模式）"]
+        C --> D["4. setCwd(cwd)<br/>（阻塞，后续依赖 cwd）"]
+        D --> E["5. Hooks 配置快照<br/>（阻塞，防止 Hook 被篡改）"]
+        E --> F["6. Worktree 创建<br/>（条件阻塞）"]
+        F --> G["7. 后台任务启动<br/>（非阻塞，fire-and-forget）"]
+        G --> H["8. 插件预取 / MCP 预加载<br/>（非阻塞，void 前缀）"]
+        H --> I["9. 安全检查<br/>（bypassPermissions 环境验证）"]
+        I --> J["10. 上次会话统计上报<br/>（非阻塞）"]
+    end</div></div>
+<h3 id="为什么-hooks-快照必须阻塞">为什么 Hooks 快照必须阻塞？</h3>
+<p><code>captureHooksConfigSnapshot()</code> 被设计为阻塞调用，位于 <code>setCwd()</code> 之后。它的作用是读取当前的 hooks 配置并冻结一份快照。之后如果有恶意代码试图修改 hooks 配置（通过修改 settings.json），系统可以通过 <code>updateHooksConfigSnapshot()</code> 检测到变化。</p>
+<p>这是一个安全设计：<strong>在用户信任确认之前，锁住 hooks 的状态</strong>。如果这个调用不是阻塞的，就会存在一个时间窗口，攻击者可以在这个窗口内修改 hooks 配置而不被检测到。</p>
+<h3 id="后台任务的非阻塞模式">后台任务的&quot;非阻塞&quot;模式</h3>
+<p><code>setup()</code> 函数中大量使用了 <code>void</code> 前缀来启动后台任务：</p>
+<pre><code class="language-typescript">void getCommands(getProjectRoot())        // 预取命令注册表
+void loadPluginHooks()                    // 预加载插件 hooks
+void prefetchApiKeyFromApiKeyHelperIfSafe // 预取 API Key
+void lockCurrentVersion()                 // 锁定当前版本</code></pre>
+<p><code>void</code> 前缀的意思是&quot;启动这个 Promise 但不等待它完成&quot;。这些操作都是后续 REPL 渲染后需要用到的，但它们不需要在 REPL 渲染前就完成。通过将它们并行启动，系统确保了 REPL 能够尽快显示在用户面前。</p>
+<h3 id="--bare-模式的优化">--bare 模式的优化</h3>
+<p><code>--bare</code> 模式（对应 <code>CLAUDE_CODE_SIMPLE=1</code>）是脚本调用模式。它的设计哲学是&quot;能跳过就跳过&quot;：</p>
+<pre><code class="language-typescript">if (!isBareMode()) {
+  initSessionMemory()
+  // ... 上下文折叠初始化 ...
+}
+// 这些在 bare 模式下被跳过：
+// - 版本锁定
+// - 插件预取
+// - 归属 hooks 注册
+// - 会话文件访问分析
+// - 团队内存同步
+// - 发布说明检查
+// - 最近活动数据获取</code></pre>
+<p>bare 模式跳过了所有面向交互式用户的功能，只保留核心的查询能力。这让 CI/CD 管道中的 <code>claude -p</code> 调用尽可能快。</p>
+<h2 id="434-maintsx-的-init-函数系统级初始化">43.4 main.tsx 的 init() 函数：系统级初始化</h2>
+<p><code>entrypoints/init.ts</code> 的 <code>init()</code> 函数被 <code>memoize</code> 包装，确保只执行一次。它负责系统级初始化：</p>
+<pre><code class="language-typescript">export const init = memoize(async (): Promise&lt;void&gt; =&gt; {
+  enableConfigs()                     // 启用配置系统
+  applySafeConfigEnvironmentVariables() // 应用安全的环境变量（信任确认前）
+  setupGracefulShutdown()             // 注册优雅退出处理
+  configureGlobalMTLS()               // 配置 mTLS
+  configureGlobalAgents()             // 配置代理和 HTTP 客户端
+  preconnectAnthropicApi()            // 预连接 API（TCP+TLS 握手与后续工作并行）
+  // ...
+})</code></pre>
+<p>值得注意的是 <code>preconnectAnthropicApi()</code>——它在配置好网络之后立即发起 TCP + TLS 握手，与后续约 100ms 的 Commander 命令处理重叠。当用户真正发起第一次查询时，API 连接已经热准备好了。</p>
+<p>另一个关键的安全设计是 <strong>环境变量的两阶段应用</strong>：</p>
+<ul>
+<li><code>applySafeConfigEnvironmentVariables()</code>：在 <code>init()</code> 中调用，只应用不涉及安全风险的环境变量。</li>
+<li><code>applyConfigEnvironmentVariables()</code>：在用户确认信任对话框之后调用，应用可能包含敏感信息的环境变量。</li>
+</ul>
+<p>这个两阶段设计确保了：<strong>在用户确认信任当前工作目录之前，来自配置文件的潜在危险环境变量不会被注入到进程中</strong>。</p>
+<p>如果把这一整章再抽象一层，Claude Code 的启动流程其实是在做一件事：<strong>把&quot;能早做的事&quot;与&quot;必须晚做的事&quot;严格分开</strong>。前者围绕并行和预取，后者围绕信任和安全。性能工程与安全工程经常被看成互相掣肘，但这套设计证明二者可以通过顺序编排同时成立。</p>
+<h2 id="435-启动性能分析基础设施">43.5 启动性能分析基础设施</h2>
+<p>Claude Code 内建了一套精细的启动性能分析系统（<code>utils/startupProfiler.ts</code>），有两种工作模式：</p>
+<ol>
+<li><strong>采样日志</strong>：100% 的内部用户、0.5% 的外部用户——自动将各阶段耗时上报到分析平台。</li>
+<li><strong>详细分析</strong>：设置 <code>CLAUDE_CODE_PROFILE_STARTUP=1</code> 后，输出完整的检查点报告和内存快照。</li>
+</ol>
+<p>系统定义了四个关键阶段：</p>
+<table><thead><tr>
+<th>阶段</th>
+<th>起止检查点</th>
+<th>含义</th>
+</tr></thead><tbody>
+<tr>
+<td>import_time</td>
+<td>cli_entry → main_tsx_imports_loaded</td>
+<td>模块加载耗时</td>
+</tr>
+<tr>
+<td>init_time</td>
+<td>init_function_start → init_function_end</td>
+<td>init() 函数耗时</td>
+</tr>
+<tr>
+<td>settings_time</td>
+<td>eagerLoadSettings_start → eagerLoadSettings_end</td>
+<td>配置加载耗时</td>
+</tr>
+<tr>
+<td>total_time</td>
+<td>cli_entry → main_after_run</td>
+<td>总启动耗时</td>
+</tr>
+</tbody></table>
+<p>采样率的设计也很巧妙：决策在模块加载时一次性做出，非采样用户不承担任何性能分析成本——<code>profileCheckpoint()</code> 在非采样情况下是空操作。</p>
+<h2 id="436-从-setup-到-repl-的完整时序">43.6 从 setup 到 REPL 的完整时序</h2>
+<div class="mermaid-block"><div class="mermaid">sequenceDiagram
+    participant User as 用户终端
+    participant CLI as cli.tsx
+    participant Main as main.tsx
+    participant Init as init.ts
+    participant Setup as setup.ts
+    participant Helper as interactiveHelpers.tsx
+    participant REPL as REPL
+
+    User->>CLI: claude [args]
+    CLI->>CLI: 快速路径检查（--version 等）
+    CLI->>CLI: startCapturingEarlyInput()
+    CLI->>Main: import main.js → cliMain()
+    Main->>Main: 副作用并行启动<br/>MDM读取 / Keychain预取
+    Main->>Init: init()
+    Init->>Init: enableConfigs()<br/>applySafeEnvVars()<br/>configureMTLS()<br/>preconnectAPI()
+    Main->>Setup: setup(cwd, permissions, ...)
+    Setup->>Setup: Node版本检查<br/>UDS服务器启动<br/>setCwd() → Hooks快照
+    Setup->>Setup: 后台任务（void 前缀）<br/>插件预取 / MCP预加载 / API Key预取
+    Main->>Main: Commander 解析完整参数
+    Main->>Main: runMigrations()
+    Main->>Helper: showSetupScreens()
+    Helper->>Helper: Onboarding → TrustDialog<br/>→ MCP服务器审批 → 策略检查
+    Main->>Main: initBundledSkills()<br/>initBuiltinPlugins()
+    Main->>REPL: renderAndRun(root, <App>)
+    REPL->>REPL: consumeEarlyInput()<br/>startDeferredPrefetches()
+    Note over User,REPL: 用户看到 REPL 界面，可以开始交互</div></div>
+<h2 id="437-设计启示">43.7 设计启示</h2>
+<h3 id="1-快速路径是最重要的性能优化">1. 快速路径是最重要的性能优化</h3>
+<p>不是因为快速路径本身有多快，而是因为它定义了系统的&quot;成本边界&quot;。每当添加一个新功能（如 daemon 模式、桥接模式），都应该在 <code>cli.tsx</code> 的快速路径中分流，而不是让它拖慢所有人的启动。这个设计让 <code>claude --version</code> 的体验与 <code>git --version</code> 一样快。</p>
+<h3 id="2-并行化的黄金法则是尽早启动延后等待">2. 并行化的黄金法则是&quot;尽早启动、延后等待&quot;</h3>
+<p><code>startMdmRawRead()</code> 和 <code>startKeychainPrefetch()</code> 在模块加载阶段就开始执行 I/O，但它们的值直到几百毫秒后才被消费。这种&quot;提前点火&quot;模式将串行的&quot;加载 → 执行 → 等待&quot;变成了并行的&quot;加载 + 执行 / 等待&quot;。</p>
+<h3 id="3-延迟初始化需要一个明确的就绪线">3. 延迟初始化需要一个明确的&quot;就绪线&quot;</h3>
+<p>Claude Code 的&quot;就绪线&quot;是 <code>renderAndRun()</code> 调用。在这之前完成的工作必须足够显示一个可用的 UI；在这之后启动的工作可以慢慢来。<code>startDeferredPrefetches()</code> 函数就是这条线的标志——它在第一次渲染后才启动。</p>
+<h3 id="4-安全性不能被性能优化牺牲">4. 安全性不能被性能优化牺牲</h3>
+<p><code>captureHooksConfigSnapshot()</code> 必须在信任确认前阻塞完成。环境变量必须分两阶段应用。这些安全约束增加了启动时间，但它们是&quot;不可谈判&quot;的。好的架构是在安全约束内寻找并行化的机会，而不是绕过安全约束来提速。</p>
+<h3 id="5-启动顺序本身就是安全策略">5. 启动顺序本身就是安全策略</h3>
+<p>哪些模块先运行，哪些环境变量后注入，哪些检查在渲染前完成，这些都不是实现细节，而是系统安全模型的一部分。顺序错了，即使每个子模块单独看都安全，整体也可能不安全。</p>
+<pre><code>源码位置：
+  entrypoints/cli.tsx         — 快速路径分流、早期输入捕获
+  main.tsx                    — 完整 CLI 入口、副作用导入、Commander 命令定义
+  entrypoints/init.ts         — 系统级初始化（memoize 包装）
+  setup.ts                    — 环境准备编排器
+  utils/startupProfiler.ts    — 启动性能分析
+  utils/earlyInput.ts         — 早期输入捕获
+  interactiveHelpers.tsx      — showSetupScreens / renderAndRun
+  bootstrap/state.ts          — 全局状态单例</code></pre>
+          
+    <div class="pager">
+      <a href="ch42.html">上一页：可观测性——日志、遥测与诊断</a>
+      <a href="ch44.html">下一页：应用状态机——从引导到就绪</a>
+    </div>
+  
+        </article>
+        <aside class="page-toc"><h2>本页导航</h2><ul><li class="toc-level-2"><a href="#cli-工具为什么必须在瞬间启动">CLI 工具为什么必须在&quot;瞬间&quot;启动</a></li>
+<li class="toc-level-2"><a href="#431-快速路径零负载的命令分流">43.1 快速路径：零负载的命令分流</a></li>
+<li class="toc-level-2"><a href="#432-关键路径并行预取与延迟初始化">43.2 关键路径：并行预取与延迟初始化</a></li>
+<li class="toc-level-2"><a href="#433-setup-函数环境准备的编排器">43.3 setup() 函数：环境准备的编排器</a></li>
+<li class="toc-level-3"><a href="#为什么-hooks-快照必须阻塞">为什么 Hooks 快照必须阻塞？</a></li>
+<li class="toc-level-3"><a href="#后台任务的非阻塞模式">后台任务的&quot;非阻塞&quot;模式</a></li>
+<li class="toc-level-3"><a href="#--bare-模式的优化">--bare 模式的优化</a></li>
+<li class="toc-level-2"><a href="#434-maintsx-的-init-函数系统级初始化">43.4 main.tsx 的 init() 函数：系统级初始化</a></li>
+<li class="toc-level-2"><a href="#435-启动性能分析基础设施">43.5 启动性能分析基础设施</a></li>
+<li class="toc-level-2"><a href="#436-从-setup-到-repl-的完整时序">43.6 从 setup 到 REPL 的完整时序</a></li>
+<li class="toc-level-2"><a href="#437-设计启示">43.7 设计启示</a></li>
+<li class="toc-level-3"><a href="#1-快速路径是最重要的性能优化">1. 快速路径是最重要的性能优化</a></li>
+<li class="toc-level-3"><a href="#2-并行化的黄金法则是尽早启动延后等待">2. 并行化的黄金法则是&quot;尽早启动、延后等待&quot;</a></li>
+<li class="toc-level-3"><a href="#3-延迟初始化需要一个明确的就绪线">3. 延迟初始化需要一个明确的&quot;就绪线&quot;</a></li>
+<li class="toc-level-3"><a href="#4-安全性不能被性能优化牺牲">4. 安全性不能被性能优化牺牲</a></li>
+<li class="toc-level-3"><a href="#5-启动顺序本身就是安全策略">5. 启动顺序本身就是安全策略</a></li></ul></aside>
+      </main>
+    </div>
+  </body>
+</html>
