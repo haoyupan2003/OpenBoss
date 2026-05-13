@@ -15,6 +15,9 @@ build/
 # IDE
 .vscode/
 .idea/
+.codebuddy/
+.workbuddy/
+.cursor/
 
 # Screenshots
 *.png
