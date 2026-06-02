@@ -1,0 +1,18 @@
+.task-list { padding: 1rem 0; }
+.task-list h2 { font-size: 1.1rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+.tl-summary { font-size: 0.75rem; background: #1e3a5f; color: #60a5fa; padding: 0.15rem 0.5rem; border-radius: 4px; }
+.tl-filters { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
+.tl-filters button { padding: 0.25rem 0.6rem; border: 1px solid #334155; background: #1e293b; color: #94a3b8; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+.tl-filters button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.tl-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.tl-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; color: #94a3b8; font-weight: 500; }
+.tl-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e293b; }
+.tl-id { font-family: monospace; font-size: 0.8rem; color: #94a3b8; }
+.tl-title { margin-bottom: 0.15rem; }
+.tl-deps { font-size: 0.7rem; color: #64748b; }
+.tl-status { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 3px; color: #fff; }
+.tl-error-msg { font-size: 0.7rem; color: #ef4444; margin-top: 0.15rem; }
+.tl-sha { font-family: monospace; font-size: 0.75rem; color: #64748b; }
+.tl-empty { color: #475569; padding: 1.5rem !important; text-align: center; }
+.tl-error { color: #ef4444; padding: 1rem 0; }
+.tl-loading { color: #64748b; padding: 1rem 0; }

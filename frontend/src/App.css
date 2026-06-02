@@ -1,0 +1,15 @@
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.header { padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; background: #1e293b; border-bottom: 1px solid #334155; }
+.header h1 { font-size: 1.25rem; }
+.version { opacity: 0.5; font-size: 0.85rem; }
+.status { margin-left: auto; font-size: 0.8rem; padding: 0.2rem 0.6rem; border-radius: 4px; }
+.status.healthy { background: #065f46; color: #6ee7b7; }
+.status:not(.healthy) { background: #78350f; color: #fbbf24; }
+.nav { display: flex; gap: 1px; background: #334155; }
+.nav a { padding: 0.6rem 1.2rem; color: #94a3b8; text-decoration: none; font-size: 0.85rem; background: #1e293b; }
+.nav a:hover { color: #e2e8f0; background: #334155; }
+.nav button { padding: 0.6rem 1.2rem; color: #94a3b8; border: none; background: #1e293b; cursor: pointer; font-size: 0.85rem; }
+.nav button:hover { color: #e2e8f0; background: #334155; }
+.nav button.tab-active { color: #60a5fa; border-bottom: 2px solid #60a5fa; }
+.nav-spacer { flex: 1; }
+.main { flex: 1; padding: 2rem; }

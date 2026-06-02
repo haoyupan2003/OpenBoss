@@ -1,27 +1,71 @@
-# Playwright MCP
-.playwright-mcp/
-
-# Dependencies
-node_modules/
-
-# Build outputs
-.next/
+# ═══ Python ═══
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
 dist/
 build/
+eggs/
+*.whl
+pip-wheel-metadata/
+.eggs/
 
-# OS files
-.DS_Store
+# ═══ 虚拟环境 ═══
+venv/
+.venv/
+env/
+.env/
 
-# IDE
-.vscode/
-.idea/
-.codebuddy/
-.workbuddy/
-.cursor/
-
-# Screenshots
-*.png
-
-# Environment
+# ═══ 环境变量（含敏感信息） ═══
+.env
 .env.local
 .env.*.local
+
+# ═══ 日志 ═══
+logs/*
+!logs/.gitkeep
+*.log
+
+# ═══ 运行时数据 ═══
+data/*
+!data/.gitkeep
+!data/backup/
+data/backup/*
+!data/backup/.gitkeep
+
+# ═══ IDE ═══
+.vscode/
+.idea/
+.cursor/
+.codebuddy/
+.workbuddy/
+*.swp
+*.swo
+*~
+
+# ═══ 操作系统 ═══
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ═══ 测试与覆盖率 ═══
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ═══ Node.js（Web 前端） ═══
+node_modules/
+.next/
+
+# ═══ Playwright ═══
+.playwright-mcp/
+test-results/
+playwright-report/
+
+# ═══ 截图与临时文件 ═══
+*.png
+*.tmp

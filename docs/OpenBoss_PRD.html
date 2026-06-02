@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>主从架构分布式Agent自动化执行系统 - 产品需求文档 V2.0</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+SC:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #FAFAF9;
+  --card: #FFFFFF;
+  --primary: #0F172A;
+  --primary-light: #1E293B;
+  --accent: #D4875A;
+  --accent-light: #E8A87C;
+  --accent-dark: #B86B3E;
+  --text: #1E293B;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  --border: #E2E8F0;
+  --surface: #F1F5F9;
+  --code-bg: #1E293B;
+  --code-text: #E2E8F0;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --danger: #EF4444;
+  --info: #3B82F6;
+  --gradient-1: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%);
+  --gradient-2: linear-gradient(135deg, #D4875A 0%, #E8A87C 100%);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.08);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent); color: white; }
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+/* ─── Navigation ─── */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(255,255,255,0.88);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner {
+  max-width: 1200px; margin: 0 auto; padding: 0 32px; height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.nav-brand { font-weight: 700; font-size: 15px; color: var(--primary); letter-spacing: -0.3px; }
+.nav-brand span { color: var(--accent); }
+.nav-links { display: flex; gap: 6px; }
+.nav-links a {
+  text-decoration: none; color: var(--text-secondary); font-size: 13px; font-weight: 500;
+  padding: 6px 12px; border-radius: 6px; transition: all 0.2s;
+}
+.nav-links a:hover { color: var(--primary); background: var(--surface); }
+
+/* ─── Cover ─── */
+.cover {
+  background: var(--gradient-1); min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; padding: 80px 40px;
+}
+.cover::before {
+  content: ''; position: absolute; top: -50%; right: -30%; width: 800px; height: 800px;
+  border-radius: 50%; background: radial-gradient(circle, rgba(212,135,90,0.15) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cover::after {
+  content: ''; position: absolute; bottom: -40%; left: -20%; width: 600px; height: 600px;
+  border-radius: 50%; background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.cover-grid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 60px 60px; pointer-events: none;
+}
+.cover-content { max-width: 780px; position: relative; z-index: 1; }
+.cover-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 16px; border-radius: 100px;
+  background: rgba(212,135,90,0.15); border: 1px solid rgba(212,135,90,0.3);
+  color: var(--accent-light); font-size: 13px; font-weight: 500;
+  margin-bottom: 32px; letter-spacing: 0.5px;
+}
+.cover-badge::before {
+  content: ''; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+.cover-title {
+  font-family: 'Inter','Noto Sans SC',sans-serif; font-size: 52px; font-weight: 800;
+  line-height: 1.2; color: white; margin-bottom: 20px; letter-spacing: -1.5px;
+}
+.cover-title .highlight {
+  background: var(--gradient-2); -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent; background-clip: text;
+}
+.cover-desc {
+  font-size: 18px; color: #94A3B8; line-height: 1.7; margin-bottom: 40px;
+  max-width: 620px; font-weight: 400;
+}
+.cover-meta { display: flex; gap: 32px; flex-wrap: wrap; }
+.cover-meta-item { display: flex; flex-direction: column; gap: 2px; }
+.cover-meta-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #64748B; font-weight: 600; }
+.cover-meta-value { font-size: 15px; color: #CBD5E1; font-weight: 500; }
+
+/* ─── Main Layout ─── */
+.main-container {
+  max-width: 1200px; margin: 0 auto; padding: 0 32px;
+  display: grid; grid-template-columns: 240px 1fr; gap: 48px; position: relative;
+}
+
+/* ─── Sidebar ─── */
+.sidebar {
+  position: sticky; top: 76px; height: fit-content;
+  max-height: calc(100vh - 100px); overflow-y: auto; padding: 24px 0;
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar-title {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--text-muted); font-weight: 700; margin-bottom: 16px; padding-left: 12px;
+}
+.sidebar ul { list-style: none; }
+.sidebar li { margin-bottom: 2px; }
+.sidebar a {
+  display: block; text-decoration: none; color: var(--text-secondary); font-size: 13px;
+  font-weight: 450; padding: 6px 12px; border-radius: var(--radius-xs);
+  transition: all 0.2s; border-left: 2px solid transparent; line-height: 1.5;
+}
+.sidebar a:hover { color: var(--primary); background: var(--surface); }
+.sidebar a.active { color: var(--accent-dark); background: rgba(212,135,90,0.08); border-left-color: var(--accent); font-weight: 600; }
+.sidebar .indent-1 { padding-left: 24px; }
+.sidebar .indent-2 { padding-left: 36px; font-size: 12.5px; }
+
+/* ─── Content ─── */
+.content { min-width: 0; padding: 48px 0 120px; }
+.doc-section { margin-bottom: 56px; }
+.section-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--accent-dark);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;
+}
+.section-tag::before { content: ''; width: 16px; height: 2px; background: var(--accent); border-radius: 1px; }
+
+h1.chapter {
+  font-size: 36px; font-weight: 800; color: var(--primary);
+  margin-bottom: 12px; letter-spacing: -0.8px; line-height: 1.2; padding-top: 48px;
+}
+h1.chapter .num { color: var(--accent); font-weight: 800; margin-right: 4px; }
+h2 { font-size: 22px; font-weight: 700; color: var(--primary); margin: 36px 0 16px; letter-spacing: -0.3px; }
+h3 { font-size: 18px; font-weight: 600; color: var(--primary-light); margin: 28px 0 12px; letter-spacing: -0.2px; }
+h4 { font-size: 16px; font-weight: 600; color: var(--primary-light); margin: 20px 0 10px; }
+
+p { text-indent: 2em; margin-bottom: 14px; line-height: 1.85; color: var(--text); font-size: 15.5px; }
+p.no-indent { text-indent: 0; }
+p.lead { font-size: 17px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 20px; }
+
+/* ─── Cards ─── */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 28px; margin: 20px 0 28px; box-shadow: var(--shadow-sm);
+}
+.card-accent { border-left: 4px solid var(--accent); }
+.card-info { border-left: 4px solid var(--info); background: #F0F7FF; }
+.card-warning { border-left: 4px solid var(--warning); background: #FFFBEB; }
+.card-success { border-left: 4px solid var(--success); background: #F0FDF4; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin: 20px 0; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px; margin: 20px 0; }
+
+.mini-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 20px; transition: all 0.2s;
+}
+.mini-card:hover { border-color: var(--accent-light); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.mini-card-icon {
+  width: 40px; height: 40px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 12px;
+}
+.mini-card h4 { font-size: 14px; font-weight: 600; color: var(--primary); margin-bottom: 6px; }
+.mini-card p { font-size: 13px; color: var(--text-secondary); text-indent: 0; line-height: 1.6; margin-bottom: 0; }
+
+/* ─── Tables ─── */
+.table-wrapper {
+  margin: 20px 0 28px; overflow-x: auto;
+  border-radius: var(--radius-sm); border: 1px solid var(--border);
+}
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+thead th {
+  background: var(--primary); color: white; font-weight: 600;
+  padding: 12px 16px; text-align: left; font-size: 13px; letter-spacing: 0.3px; white-space: nowrap;
+}
+tbody td { padding: 11px 16px; border-bottom: 1px solid var(--border); vertical-align: top; font-size: 14px; line-height: 1.6; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) { background: #FAFBFC; }
+tbody tr:hover { background: #F1F5F9; }
+.table-caption { text-align: left; font-size: 13px; color: var(--text-muted); margin-top: 8px; font-style: italic; }
+
+/* ─── Code ─── */
+.code-block {
+  background: var(--code-bg); border-radius: var(--radius-sm);
+  overflow: hidden; margin: 16px 0 24px; box-shadow: var(--shadow-md);
+}
+.code-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.code-dots { display: flex; gap: 6px; }
+.code-dots span { width: 10px; height: 10px; border-radius: 50%; }
+.code-dots span:nth-child(1) { background: #EF4444; }
+.code-dots span:nth-child(2) { background: #F59E0B; }
+.code-dots span:nth-child(3) { background: #10B981; }
+.code-filename { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #94A3B8; }
+.code-block pre { padding: 16px 20px; overflow-x: auto; margin: 0; }
+.code-block code {
+  font-family: 'JetBrains Mono','Fira Code', monospace; font-size: 13px;
+  color: var(--code-text); line-height: 1.75; white-space: pre;
+}
+code:not(pre code) {
+  font-family: 'JetBrains Mono', monospace; font-size: 13px;
+  background: var(--surface); color: var(--accent-dark);
+  padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border);
+}
+
+/* ─── Mermaid ─── */
+.mermaid-wrapper {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 32px 24px; margin: 24px 0;
+  box-shadow: var(--shadow-sm); overflow-x: auto;
+}
+.mermaid-wrapper .mermaid { display: flex; justify-content: center; }
+.mermaid-caption { text-align: center; font-size: 13px; color: var(--text-muted); margin-top: 16px; font-style: italic; }
+.mermaid { font-size: 14px; }
+
+/* ─── Lists ─── */
+.feature-list { list-style: none; margin: 16px 0; }
+.feature-list li { padding: 10px 0 10px 28px; position: relative; font-size: 15px; line-height: 1.7; text-indent: 0; }
+.feature-list li::before { content: ''; position: absolute; left: 4px; top: 18px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: 0.7; }
+
+.step-list { list-style: none; counter-reset: steps; margin: 16px 0; }
+.step-list li {
+  counter-increment: steps; padding: 12px 0 12px 48px; position: relative;
+  font-size: 15px; line-height: 1.7; text-indent: 0;
+}
+.step-list li::before {
+  content: counter(steps); position: absolute; left: 0; top: 10px;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--gradient-2); color: white; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ─── Tags ─── */
+.tag { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 12px; font-weight: 600; margin-right: 4px; }
+.tag-blue { background: #DBEAFE; color: #1D4ED8; }
+.tag-green { background: #D1FAE5; color: #065F46; }
+.tag-orange { background: #FED7AA; color: #9A3412; }
+.tag-red { background: #FEE2E2; color: #991B1B; }
+.tag-purple { background: #EDE9FE; color: #5B21B6; }
+
+/* ─── Callout ─── */
+.callout { padding: 20px 24px; border-radius: var(--radius-sm); margin: 20px 0; font-size: 14.5px; line-height: 1.7; }
+.callout p { text-indent: 0; margin-bottom: 0; }
+.callout-title { font-weight: 700; font-size: 14px; margin-bottom: 6px; }
+.callout-info { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E40AF; }
+.callout-warn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+.callout-tip { background: #F0FDF4; border: 1px solid #BBF7D0; color: #166534; }
+
+/* ─── Divider ─── */
+.divider { height: 1px; background: var(--border); margin: 48px 0; }
+
+/* ─── File Tree ─── */
+.file-tree {
+  font-family: 'JetBrains Mono', monospace; font-size: 13.5px; line-height: 2;
+  color: var(--text); background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 24px 28px; margin: 20px 0 28px; overflow-x: auto;
+}
+.file-tree .dir { color: var(--accent-dark); font-weight: 600; }
+.file-tree .file { color: var(--text); }
+.file-tree .comment { color: var(--text-muted); }
+.file-tree .highlight { color: var(--accent); }
+
+/* ─── Phase Timeline ─── */
+.phase-timeline { position: relative; padding-left: 32px; margin: 24px 0; }
+.phase-timeline::before {
+  content: ''; position: absolute; left: 11px; top: 0; bottom: 0;
+  width: 2px; background: var(--border);
+}
+.phase-item { position: relative; margin-bottom: 28px; }
+.phase-item::before {
+  content: ''; position: absolute; left: -25px; top: 6px;
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--accent); border: 3px solid var(--card);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.phase-item h4 { font-size: 16px; font-weight: 700; color: var(--primary); margin-bottom: 8px; }
+.phase-item p { font-size: 14px; text-indent: 0; line-height: 1.75; }
+
+/* ─── Print ─── */
+@media print {
+  .nav, .sidebar { display: none !important; }
+  .main-container { grid-template-columns: 1fr; padding: 0; }
+  .content { padding: 0; }
+  .cover { min-height: auto; padding: 40px; }
+  .cover-title { font-size: 32px; }
+  h1.chapter { page-break-before: always; font-size: 28px; }
+  .code-block, .mermaid-wrapper { break-inside: avoid; }
+  body { background: white; }
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .main-container { grid-template-columns: 1fr; padding: 0 20px; }
+  .sidebar { display: none; }
+  .cover-title { font-size: 36px; }
+  .cover-desc { font-size: 16px; }
+  .cover-meta { flex-direction: column; gap: 12px; }
+  .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+  h1.chapter { font-size: 28px; }
+  .nav-links { display: none; }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.doc-section { animation: fadeInUp 0.5s ease; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ NAV ══════════════════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-brand">Agent<span>System</span> PRD v2.0</div>
+    <div class="nav-links">
+      <a href="#ch1">概述</a>
+      <a href="#ch2">原则</a>
+      <a href="#ch3">架构</a>
+      <a href="#ch4">功能</a>
+      <a href="#ch5">工作流</a>
+      <a href="#ch6">文件规范</a>
+      <a href="#ch7">异常处理</a>
+      <a href="#ch8">开发计划</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════ COVER ══════════════════ -->
+<div class="cover">
+  <div class="cover-grid"></div>
+  <div class="cover-content">
+    <div class="cover-badge">PRODUCT REQUIREMENTS DOCUMENT &mdash; V2.0</div>
+    <h1 class="cover-title">
+      <span class="highlight">主从架构分布式</span><br>
+      Agent 自动化执行系统
+    </h1>
+    <p class="cover-desc">
+      基于 Web 应用管理面板 + Claude Code CLI + tmux 终端管理的多 Agent 协同平台。
+      借鉴 Ralph Shell 循环执行思想，通过编排者/老板角色驱动，结合 BDD 需求精炼、TDD 质量保障、Git 版本管理、进程监控与移动端告警，打造端到端的高可用自动化任务执行引擎。
+    </p>
+    <div class="cover-meta">
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">版本</span>
+        <span class="cover-meta-value">V2.0</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">状态</span>
+        <span class="cover-meta-value">对齐修订</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">日期</span>
+        <span class="cover-meta-value">2026.05.13</span>
+      </div>
+      <div class="cover-meta-item">
+        <span class="cover-meta-label">章节</span>
+        <span class="cover-meta-value">10 Chapters</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<div class="main-container">
+
+<!-- ─── Sidebar ─── -->
+<aside class="sidebar">
+  <div class="sidebar-title">目录导航</div>
+  <ul>
+    <li><a href="#ch1">第一章 产品概述</a></li>
+    <li><a href="#s1-1" class="indent-1">1.1 项目背景</a></li>
+    <li><a href="#s1-2" class="indent-1">1.2 产品定位</a></li>
+    <li><a href="#s1-3" class="indent-1">1.3 核心概念</a></li>
+    <li><a href="#s1-4" class="indent-1">1.4 术语与缩略语</a></li>
+    <li><a href="#ch2">第二章 设计原则</a></li>
+    <li><a href="#ch3">第三章 系统架构</a></li>
+    <li><a href="#s3-1" class="indent-1">3.1 五层架构</a></li>
+    <li><a href="#s3-2" class="indent-1">3.2 核心组件</a></li>
+    <li><a href="#s3-3" class="indent-1">3.3 通信机制</a></li>
+    <li><a href="#ch4">第四章 核心功能</a></li>
+    <li><a href="#s4-1" class="indent-1">4.1 Web 管理面板</a></li>
+    <li><a href="#s4-2" class="indent-1">4.2 Claude Code CLI</a></li>
+    <li><a href="#s4-3" class="indent-1">4.3 Master Agent</a></li>
+    <li><a href="#s4-4" class="indent-1">4.4 Sub-Agent</a></li>
+    <li><a href="#s4-5" class="indent-1">4.5 tmux 终端管理</a></li>
+    <li><a href="#s4-6" class="indent-1">4.6 OpenClaw 监控</a></li>
+    <li><a href="#s4-7" class="indent-1">4.7 Git 版本管理</a></li>
+    <li><a href="#ch5">第五章 端到端工作流</a></li>
+    <li><a href="#s5-1" class="indent-1">5.1 需求定义阶段</a></li>
+    <li><a href="#s5-2" class="indent-1">5.2 任务执行阶段</a></li>
+    <li><a href="#s5-3" class="indent-1">5.3 失败恢复阶段</a></li>
+    <li><a href="#ch6">第六章 文件格式规范</a></li>
+    <li><a href="#ch7">第七章 异常处理</a></li>
+    <li><a href="#ch8">第八章 开发计划</a></li>
+    <li><a href="#ch9">第九章 测试策略</a></li>
+    <li><a href="#ch10">第十章 部署运维</a></li>
+  </ul>
+</aside>
+
+<!-- ─── Content ─── -->
+<div class="content">
+
+<!-- ══════════════════════════════════════════════════════════════
+     第一章  产品概述
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch1">
+  <div class="section-tag">CHAPTER 01</div>
+  <h1 class="chapter"><span class="num">01</span> 产品概述</h1>
+  <p class="lead no-indent">定义系统的背景、定位、核心概念与关键术语。</p>
+
+  <h2 id="s1-1">1.1 项目背景</h2>
+  <p>随着大语言模型（LLM）和 AI Agent 技术的快速发展，利用智能化代理完成复杂软件工程任务已成为行业趋势。Claude Code CLI 等工具的出现，使得 AI Agent 可以直接在本地终端中执行代码编写、调试、测试等操作，极大地拓展了自动化的边界。然而，当前大多数 Agent 系统存在以下核心痛点：单个 Agent 承担过多职责导致上下文过载，难以处理大型复杂任务；Agent 之间缺乏有效的协同机制，无法实现真正的并行化执行；系统的状态管理依赖进程内存，一旦崩溃便丢失全部进度；缺乏完善的可观测性手段，任务执行过程如同黑箱，难以进行有效的调试和监控；用户无法直观地管理和监控多个 Agent 的实时工作状态。</p>
+  <p>为了解决上述问题，本项目提出了一种基于 Web 应用 + 主从架构的分布式 Agent 自动化执行系统。该系统借鉴了 Ralph Shell 循环执行的核心思想，将其升级为多 Agent 协同模式。用户通过 Web 应用管理面板作为统一入口，系统默认启动一个 Master Agent（Claude Code CLI），扮演编排者/老板的角色，并通过 tmux 终端复用器动态创建和管理多个 Sub-Agent CLI 实例。所有状态通过文件系统持久化，结合 BDD 需求精炼、TDD 质量保障、Git 版本管理、OpenClaw 进程监控与移动端告警机制，打造一个端到端的高可用、可扩展、可观测的自动化任务执行平台。</p>
+
+  <h2 id="s1-2">1.2 产品定位</h2>
+  <p>本系统的核心定位是：一个<strong>以 Web 应用为入口、以 Claude Code CLI 为执行引擎、以 tmux 为终端管理中枢</strong>的多 Agent 分布式协同平台。系统的使用模式可以概括为以下场景：用户打开 Web 应用管理面板，在 UI 上看到各个 Agent 的实时工作状态。系统默认先开启一个 Master Agent Claude Code CLI，并赋予其编排者/老板的角色特征以及 Harness 约束工程规范。用户通过面板或终端给老板下达真正要实现的需求，老板则通过 tmux 继续增加新的 CLI Sub-Agent 实例来完成不同阶段的工作。</p>
+
+  <div class="grid-2">
+    <div class="mini-card">
+      <div class="mini-card-icon" style="background:#F0FDF4;color:#10B981;">&#x21BB;</div>
+      <h4>Web 应用入口</h4>
+      <p>以 Web 管理面板为统一入口，UI 形式管理各 Agent 工作状态，通过 tmux 连接本地 Claude Code CLI 进行工作。</p>
+    </div>
+    <div class="mini-card">
+      <div class="mini-card-icon" style="background:#FEF3C7;color:#D97706;">&#x26A0;</div>
+      <h4>编排者/老板模式</h4>
+      <p>Master Agent 扮演编排者角色，具备决策调度能力，通过 tmux 动态创建 Sub-Agent 分发任务。</p>
+    </div>
+    <div class="mini-card">
+      <div class="mini-card-icon" style="background:#EFF6FF;color:#3B82F6;">&#x2699;</div>
+      <h4>BDD + TDD 闭环</h4>
+      <p>Product Manager Agent 通过 BDD 与用户多次沟通敲定功能细节，杜绝模糊；每个 task 配有测试脚本。</p>
+    </div>
+    <div class="mini-card">
+      <div class="mini-card-icon" style="background:#FDF2F8;color:#EC4899;">&#x2726;</div>
+      <h4>Git 版本管理</h4>
+      <p>每个 task 完成后自动 git commit，任务失败也记录在案，保证完整的开发过程可追溯。</p>
+    </div>
+  </div>
+
+  <h2 id="s1-3">1.3 核心概念</h2>
+  <p>本系统引入了"角色化 Agent"的核心概念。每个 Claude Code CLI 实例在启动时都会被赋予特定的角色特征和 Harness 约束，例如产品经理、高级开发工程师、高级编剧、测试工程师等。角色化设计确保每个 Agent 都在明确的职责边界内工作，不会越权执行不属于自身职责的任务。Master Agent 作为编排者/老板，负责全局决策和任务调度，但不执行具体的业务逻辑。Sub-Agent 在接收到任务后独立执行，完成后更新进度并通过 Git 提交代码，然后自动退出，实现真正的无状态执行。</p>
+  <p>系统的工作规模可以非常大——Product Manager Agent 拆解出的 task.json 中可能包含几十甚至上百个原子任务，Master Agent 需要智能决策哪些任务需要哪些类型的 Sub-Agent 来完成，并根据任务间的依赖关系合理安排执行顺序和并行策略。</p>
+
+  <h2 id="s1-4">1.4 术语与缩略语</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>术语</th><th>英文全称</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td><code>Agent</code></td><td>Autonomous Agent</td><td>具备自主决策和执行能力的智能代理，本系统中通过 Claude Code CLI 实例化</td></tr>
+        <tr><td><code>Master Agent</code></td><td>Master Scheduling Agent</td><td>主调度代理，扮演编排者/老板角色，负责任务决策、Sub-Agent 调度与全局管理</td></tr>
+        <tr><td><code>Sub-Agent</code></td><td>Subordinate Execution Agent</td><td>从属执行代理，被赋予特定角色（如产品经理、开发工程师等），负责具体执行</td></tr>
+        <tr><td><code>Harness</code></td><td>Behavior Harness</td><td>行为约束规则文件，定义 Agent 的角色特征、职责范围与行为规范</td></tr>
+        <tr><td><code>BDD</code></td><td>Behavior-Driven Development</td><td>行为驱动开发，通过 Given-When-Then 结构化描述确保需求无歧义</td></tr>
+        <tr><td><code>TDD</code></td><td>Test-Driven Development</td><td>测试驱动开发，先编写测试再编写功能代码，确保质量</td></tr>
+        <tr><td><code>task.json</code></td><td>Task Definition File</td><td>Product Manager Agent 输出的任务定义文件，包含所有原子任务的完整描述</td></tr>
+        <tr><td><code>OpenClaw</code></td><td>OpenClaw Monitor</td><td>独立进程监控器，负责监控所有 Agent 进程状态并推送移动端告警</td></tr>
+        <tr><td><code>tmux</code></td><td>Terminal Multiplexer</td><td>终端复用器，用于管理多个 Agent CLI 的终端会话</td></tr>
+        <tr><td><code>Claude Code CLI</code></td><td>Claude Code Command-Line Interface</td><td>Anthropic 提供的命令行 AI 编程工具，作为每个 Agent 的执行引擎</td></tr>
+        <tr><td><code>Playwright CLI</code></td><td>Playwright Command-Line Interface</td><td>浏览器自动化测试工具，可用于 UI 测试验证和截图确认</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 1-1 术语与缩略语</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第二章  设计原则
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch2">
+  <div class="section-tag">CHAPTER 02</div>
+  <h1 class="chapter"><span class="num">02</span> 设计原则</h1>
+  <p class="lead no-indent">五大核心原则：Web 优先入口、角色化执行、无状态通信、全链路可观测、工程化闭环。</p>
+
+  <h2>2.1 Web 优先入口原则</h2>
+  <p>用户交互层统一通过 Web 应用管理面板进入，而非直接操作终端。Web 面板提供直观的 UI 来查看和管理各个 Agent 在做什么，包括实时状态、任务进度、日志输出、终端连接等。底层通过 tmux 连接本地的 Claude Code CLI 等工具进行实际工作，用户无需关心底层终端细节，也可以随时通过面板切换到某个 Agent 的终端进行直接交互。这种"Web 入口 + 终端执行"的分层设计，既降低了使用门槛，又保留了终端操作的灵活性。</p>
+
+  <h2>2.2 角色化执行原则</h2>
+  <p>每个 Claude Code CLI 实例在启动时被赋予明确的角色特征和 Harness 约束。Master Agent 是编排者/老板，负责全局决策和任务调度，不执行具体业务逻辑。Product Manager Agent 负责需求精炼和任务拆解。高级开发工程师 Agent 负责编码实现。测试工程师 Agent 负责编写和执行测试脚本。角色化的好处在于：每个 Agent 都清楚自己的职责边界，不会越权操作；Harness 约束确保行为规范一致；角色可以灵活扩展，添加新的角色类型无需修改核心调度逻辑。</p>
+
+  <h2>2.3 无状态通信原则</h2>
+  <p>所有 Sub-Agent 在执行过程中不保留任何上下文记忆，每个 Sub-Agent 的输入参数、执行过程状态、输出结果均通过文件系统进行持久化存储和传递。这种设计确保了：任何 Agent 进程崩溃都不影响系统整体状态；Master Agent 可以随时启动新的 Sub-Agent 进程处理任务，无需考虑状态恢复；文件系统天然支持并发读写，多个 Sub-Agent 可以安全地同时操作不同的文件，实现真正的并行执行。每个 Sub-Agent 的完整生命周期为：启动 → 读取输入 → 执行任务 → 写入输出 → Git 提交 → 更新进度 → 退出进程。</p>
+
+  <h2>2.4 全链路可观测原则</h2>
+  <p>系统从设计之初就将可观测性作为核心功能。三层可观测机制覆盖了不同维度：文件层通过 progress.md 提供全局任务视图，memory.md 记录知识累积，dynamic_log.md 记录实时操作日志；进程层通过 tmux 提供每个 Agent 的实时终端输出查看；监控层通过 OpenClaw 进行最底层的进程存活检测、超时检测和资源监控。此外，Web 管理面板将所有可观测数据汇总展示，用户可以一站式查看系统全局状态。</p>
+
+  <h2>2.5 工程化闭环原则</h2>
+  <p>需求定义阶段采用 BDD 格式，Product Manager Agent 通过 Given-When-Then 结构与用户反复沟通，确保每个功能细节都被精确定义，杜绝需求模糊。每个 task 都配有对应的测试脚本（可以使用 Playwright CLI 进行浏览器操作验证和截图确认等）。开发阶段采用 TDD 流程，先编写测试再编写功能代码。每个 task 完成并通过测试后，自动进行 Git 提交，将本任务所做的所有代码变更提交到版本控制系统，确保开发过程完全可追溯。BDD + TDD + Git 三者形成了一个完整的工程化闭环。</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第三章  系统架构
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch3">
+  <div class="section-tag">CHAPTER 03</div>
+  <h1 class="chapter"><span class="num">03</span> 系统架构</h1>
+  <p class="lead no-indent">五层架构：Web 应用层、tmux 终管理层、Agent 执行层、监控告警层、文件系统状态层。</p>
+
+  <h2 id="s3-1">3.1 系统整体架构</h2>
+  <p>本系统采用五层架构设计。最顶层是 Web 应用管理面板，作为用户的统一入口；第二层是 tmux 终端管理层，负责管理所有 Claude Code CLI 实例的终端会话；第三层是 Agent 执行层，包含 Master Agent 和 Sub-Agent 工作池；第四层是监控告警层，由 OpenClaw 独立进程承担；最底层是文件系统状态层，作为所有组件的通信枢纽和持久化存储。</p>
+
+  <div class="mermaid-wrapper">
+    <div class="mermaid">
+graph TB
+    subgraph L1["&#x1F310; Web 应用管理层"]
+        direction LR
+        W1["管理面板 UI<br/><small>Agent 状态 / 任务进度</small>"]
+        W2["终端视图<br/><small>实时输出查看</small>"]
+        W3["需求交互<br/><small>BDD 确认 / 指令下达</small>"]
+    end
+
+    subgraph L2["&#x1F4BB; tmux 终端管理层"]
+        direction LR
+        T1["tmux Server<br/><small>会话管理 / 持久化</small>"]
+        T2["Claude Code CLI<br/><small>Master Agent 实例</small>"]
+        T3["Claude Code CLI x N<br/><small>Sub-Agent 实例池</small>"]
+    end
+
+    subgraph L3["&#x1F916; Agent 执行层"]
+        direction LR
+        MA["Master Agent<br/><small>编排者 / 老板</small>"]
+        subgraph SP["Sub-Agent 工作池"]
+            PM["Product Manager<br/>Agent"]
+            DEV["Senior Developer<br/>Agent"]
+            QA["Test Engineer<br/>Agent"]
+            SN["... N"]
+        end
+    end
+
+    subgraph L4["&#x1F514; 监控告警层"]
+        direction LR
+        OC["OpenClaw 监控器<br/><small>进程检测 / 资源监控</small>"]
+        AL["移动端告警<br/><small>企微 / 钉钉 / Slack</small>"]
+    end
+
+    subgraph L5["&#x1F4C2; 文件系统状态层"]
+        direction LR
+        F1["task.json"]
+        F2["progress.txt"]
+        F3["memory.md"]
+        F4["harness/*.md"]
+        F5["logs/*.log"]
+        F6["Git Repo"]
+    end
+
+    W1 <-->|"状态同步"| T1
+    W2 <-->|"终端输出"| T1
+    W3 <-->|"交互"| MA
+    T1 -.->|"创建/管理"| T2
+    T1 -.->|"创建/管理"| T3
+    T2 ===|"承载"| MA
+    T3 ===|"承载"| SP
+    MA <-->|"调度 / 分发"| SP
+    OC -.->|"进程监控"| T2
+    OC -.->|"进程监控"| T3
+    OC <-->|"告警推送"| AL
+    MA <-->|"读写"| F1
+    SP <-->|"读写"| F2
+    SP <-->|"读写"| F3
+    MA <-->|"读取"| F4
+    SP <-->|"读取"| F4
+    SP <-->|"追加"| F5
+    SP <-->|"commit"| F6
+
+    style L1 fill:#F1F5F9,stroke:#CBD5E1,stroke-width:1px
+    style L2 fill:#FFF7ED,stroke:#FED7AA,stroke-width:1px
+    style L3 fill:#EFF6FF,stroke:#BFDBFE,stroke-width:1px
+    style L4 fill:#FEF2F2,stroke:#FECACA,stroke-width:1px
+    style L5 fill:#F0FDF4,stroke:#BBF7D0,stroke-width:1px
+    style MA fill:#DBEAFE,stroke:#3B82F6,stroke-width:2px
+    style SP fill:#E0E7FF,stroke:#818CF8,stroke-width:1px
+    style OC fill:#FED7AA,stroke:#F59E0B,stroke-width:1.5px
+    </div>
+    <p class="mermaid-caption">图 3-1 系统整体架构图（五层架构）</p>
+  </div>
+
+  <h2 id="s3-2">3.2 核心组件说明</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>组件</th><th>层级</th><th>职责描述</th><th>技术实现</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Web 管理面板</strong></td>
+          <td>应用层</td>
+          <td>提供 UI 界面管理各 Agent 实时状态、任务进度、日志输出；支持需求交互和 BDD 确认；提供终端视图连接 tmux 会话</td>
+          <td>Web Framework（React/Vue）</td>
+        </tr>
+        <tr>
+          <td><strong>tmux Server</strong></td>
+          <td>终端层</td>
+          <td>管理所有 Claude Code CLI 实例的终端会话，提供会话持久化和恢复能力，支持 SSH 断开后进程继续运行</td>
+          <td>tmux 终端复用器</td>
+        </tr>
+        <tr>
+          <td><strong>Master Agent</strong></td>
+          <td>执行层</td>
+          <td>扮演编排者/老板角色，接收用户需求，通过 tmux 创建 Sub-Agent CLI 实例，决策任务分配，监控执行进度，处理失败和恢复</td>
+          <td>Claude Code CLI + main-rules.md Harness</td>
+        </tr>
+        <tr>
+          <td><strong>Sub-Agent</strong></td>
+          <td>执行层</td>
+          <td>被赋予特定角色（产品经理、开发工程师、编剧等），独立执行单一任务，完成后更新进度并 Git 提交</td>
+          <td>Claude Code CLI + sub-rules.md Harness</td>
+        </tr>
+        <tr>
+          <td><strong>OpenClaw</strong></td>
+          <td>监控层</td>
+          <td>独立进程监控所有 Agent CLI 进程存活状态、执行超时、资源使用；检测到异常时推送移动端告警，等待人工介入</td>
+          <td>openclaw/monitor.py + alert.py</td>
+        </tr>
+        <tr>
+          <td><strong>文件系统状态层</strong></td>
+          <td>存储层</td>
+          <td>作为所有组件的通信枢纽和持久化中心，存储 task.json、progress.txt、memory.md、日志文件等</td>
+          <td>本地文件系统 + Git</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 3-1 核心组件说明</p>
+
+  <h2 id="s3-3">3.3 组件间通信机制</h2>
+  <p>本系统采用"文件系统 + tmux"双通道通信模式。文件系统通道负责持久化数据的异步传递：Master Agent 写入 task.json 定义任务，Sub-Agent 从中读取任务描述；Sub-Agent 完成后将结果写入 progress.txt 和 memory.md，其他组件从中读取最新状态；所有组件将操作日志追加到 logs/ 目录下的日志文件。tmux 通道负责实时交互：Web 面板通过 tmux 连接到特定 Agent 的终端会话，实现实时输出查看和指令输入；Master Agent 通过 tmux send-keys 命令向 Sub-Agent 发送指令。两个通道互为补充，文件系统保证可靠性和持久性，tmux 保证实时性和交互性。</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第四章  核心功能详细说明
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch4">
+  <div class="section-tag">CHAPTER 04</div>
+  <h1 class="chapter"><span class="num">04</span> 核心功能详细说明</h1>
+  <p class="lead no-indent">Web 管理面板、Claude Code CLI 集成、Master Agent 调度引擎、Sub-Agent 执行框架、tmux 终端管理、OpenClaw 监控告警、Git 版本管理。</p>
+
+  <h2 id="s4-1">4.1 Web 应用管理面板</h2>
+  <h3>4.1.1 核心功能</h3>
+  <p>Web 应用管理面板是用户与整个系统交互的唯一入口。面板提供以下核心功能：Agent 状态总览，以卡片或列表形式展示当前所有 Agent（Master Agent 和各 Sub-Agent）的实时状态，包括运行中、等待中、已完成、失败等状态标识；任务进度看板，以看板或甘特图形式展示 task.json 中所有任务的执行进度和依赖关系；终端视图，嵌入式的终端窗口，用户可以通过面板直接查看任意 Agent 的 tmux 终端输出，也可以切换到交互模式发送指令；需求交互界面，用于 Product Manager Agent 与用户之间进行 BDD 需求确认的交互面板；告警通知中心，展示 OpenClaw 推送的历史告警记录和当前待处理的人工介入请求。</p>
+
+  <h3>4.1.2 技术架构</h3>
+  <p>Web 应用采用前后端分离架构。前端使用 React 或 Vue 构建 SPA 应用，通过 WebSocket 与后端保持实时连接，获取 Agent 状态更新和日志流。后端负责与 tmux Server 交互（通过 libtmux 或 tmux 命令行），读取文件系统状态数据，转发用户指令。Web 应用默认监听本地端口，用户在浏览器中访问即可使用。在安全方面，Web 应用仅监听 localhost，不暴露到公网；如需远程访问，建议通过 SSH 隧道或 VPN。</p>
+
+  <h2 id="s4-2">4.2 Claude Code CLI 集成</h2>
+  <p>Claude Code CLI 是本系统中每个 Agent 实例的执行引擎。系统通过 tmux 创建新的终端窗口，并在其中启动 Claude Code CLI 进程。每个 CLI 实例启动时，Master Agent 会通过 tmux send-keys 将角色定义和 Harness 约束注入到 CLI 中，使其具备特定角色的行为特征。例如，启动一个"高级开发工程师"Sub-Agent 时，会注入 sub-rules.md 中定义的职责范围、编码规范、提交规则等约束。Claude Code CLI 具备强大的代码理解、生成和调试能力，结合角色化 Harness 约束，可以高效地完成各类型任务。tmux 的会话持久化特性确保即使 SSH 断开，Agent 进程仍在后台继续执行。</p>
+
+  <h2 id="s4-3">4.3 主调度 Agent（Master Agent）</h2>
+  <h3>4.3.1 角色定位</h3>
+  <p>Master Agent 是系统的编排者/老板，由一个默认启动的 Claude Code CLI 实例承载。它被赋予了 main-rules.md Harness 约束，明确其职责范围包括：接收和解读用户的原始需求；通过 tmux 创建和管理 Sub-Agent CLI 实例；决策任务拆解策略和分配方案；监控全局执行进度；处理任务失败和异常恢复。Master Agent 不执行具体的业务逻辑——它不编写代码、不运行测试、不做数据分析，这些工作全部委派给具有对应角色特质的 Sub-Agent 完成。</p>
+
+  <h3>4.3.2 工作流程</h3>
+  <div class="mermaid-wrapper">
+    <div class="mermaid">
+flowchart TD
+    A(["&#x1F7E2; 系统启动"]) --> B["Web 面板初始化<br/>启动 Master Agent<br/>Claude Code CLI"]
+    B --> C["注入 main-rules.md<br/>Harness 约束"]
+    C --> D["用户下达需求<br/>通过 Web 面板 / 终端"]
+    D --> E["Master Agent 启动<br/>Product Manager Sub-Agent<br/>via tmux"]
+    E --> F["PM Agent 通过 BDD<br/>与用户反复沟通<br/>敲定每个功能细节"]
+    F --> G{"task.json<br/>是否确认?"}
+    G -- "否" --> F
+    G -- "是" --> H["PM Agent 为每个 task<br/>编写测试脚本<br/>Playwright CLI 等"]
+    H --> I["交付完整 task.json<br/>给 Master Agent"]
+    I --> J["Master Agent 作为大脑<br/>分析 task 依赖关系<br/>决策分配方案"]
+    J --> K{"任务队列<br/>是否为空?"}
+    K -- "是" --> END(["&#x1F534; 全部完成"])
+    K -- "否" --> L["选取下一 task<br/>匹配最佳 Sub-Agent 角色"]
+    L --> M["通过 tmux 创建<br/>对应角色 Sub-Agent CLI"]
+    M --> N["Sub-Agent 执行任务<br/>编写代码 / 实现功能"]
+    N --> O{"执行结果?"}
+    O -- "&#x2705; 成功 + 测试通过" --> P["更新 progress.txt<br/>更新 task.json 状态<br/>git commit 本任务"]
+    P --> K
+    O -- "&#x274C; 失败" --> Q["记录失败信息<br/>更新 task.json 状态"]
+    Q --> R["Master Agent<br/>暂停整个任务流"]
+    R --> S["通知 OpenClaw<br/>触发移动端告警<br/>等待人工介入"]
+    S --> T["人工给出<br/>修复方案"]
+    T --> U["从失败 task 开始<br/>用新方案派定 Sub-Agent<br/>重新执行"]
+    U --> N
+
+    style A fill:#DCFCE7,stroke:#22C55E,stroke-width:2px
+    style END fill:#DCFCE7,stroke:#22C55E,stroke-width:2px
+    style G fill:#FEF9C3,stroke:#EAB308,stroke-width:2px
+    style K fill:#FEF9C3,stroke:#EAB308,stroke-width:2px
+    style O fill:#FEF9C3,stroke:#EAB308,stroke-width:2px
+    style Q fill:#FEE2E2,stroke:#EF4444,stroke-width:1.5px
+    style R fill:#FEE2E2,stroke:#EF4444,stroke-width:1.5px
+    style S fill:#FEF3C7,stroke:#F59E0B,stroke-width:2px
+    style T fill:#DBEAFE,stroke:#3B82F6,stroke-width:2px
+    style U fill:#DBEAFE,stroke:#3B82F6,stroke-width:1.5px
+    </div>
+    <p class="mermaid-caption">图 4-1 Master Agent 完整工作流程图（含失败恢复）</p>
+  </div>
+
+  <h2 id="s4-4">4.4 执行 Agent（Sub-Agent）</h2>
+  <h3>4.4.1 Sub-Agent 类型与角色</h3>
+  <p>Sub-Agent 是被 Master Agent 通过 tmux 动态创建的 Claude Code CLI 实例，每个实例在启动时被注入特定的角色定义和 Harness 约束。系统预置以下角色类型，开发者也可以根据需要扩展新的角色：</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>角色名称</th><th>角色职责</th><th>Harmoness 文件</th><th>典型任务</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Product Manager<br/>（产品经理）</strong></td>
+          <td>需求精炼、任务拆解、BDD 沟通</td>
+          <td><code>sub-rules.md</code></td>
+          <td>将大需求拆解为几十上百个原子 task；用 BDD 与用户反复确认每个功能细节；为每个 task 编写测试脚本</td>
+        </tr>
+        <tr>
+          <td><strong>Senior Developer<br/>（高级开发工程师）</strong></td>
+          <td>编码实现、代码重构</td>
+          <td><code>sub-rules.md</code></td>
+          <td>根据 task 描述编写功能代码；确保代码通过已有的测试脚本；完成后 git commit</td>
+        </tr>
+        <tr>
+          <td><strong>Senior Screenwriter<br/>（高级编剧）</strong></td>
+          <td>文案创作、内容生成</td>
+          <td><code>sub-rules.md</code></td>
+          <td>根据 task 描述撰写文档、脚本、营销文案等</td>
+        </tr>
+        <tr>
+          <td><strong>Test Engineer<br/>（测试工程师）</strong></td>
+          <td>测试编写、质量验证</td>
+          <td><code>sub-rules.md</code></td>
+          <td>使用 Playwright CLI 进行浏览器操作和截图确认；编写和执行自动化测试</td>
+        </tr>
+        <tr>
+          <td><strong>Data Analyst<br/>（数据分析师）</strong></td>
+          <td>数据处理、统计分析</td>
+          <td><code>sub-rules.md</code></td>
+          <td>数据清洗、格式转换、统计分析、报表生成</td>
+        </tr>
+        <tr>
+          <td><strong>Browser Task Agent<br/>（浏览器自动化）</strong></td>
+          <td>浏览器操作、网页交互</td>
+          <td><code>sub-rules.md</code></td>
+          <td>网页数据抓取、UI 自动化操作、截图验证</td>
+        </tr>
+        <tr>
+          <td><strong>API Request Agent<br/>（接口请求）</strong></td>
+          <td>API 调用、接口测试</td>
+          <td><code>sub-rules.md</code></td>
+          <td>API 调用、接口测试、数据同步、集成验证</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 4-1 Sub-Agent 角色类型一览</p>
+
+  <h3>4.4.2 Sub-Agent 生命周期</h3>
+  <div class="mermaid-wrapper">
+    <div class="mermaid">
+flowchart TD
+    A(["&#x1F7E2; 被创建"]) --> B["tmux 新建窗口<br/>启动 Claude Code CLI"]
+    B --> C["Master Agent 注入<br/>角色定义 + Harness 约束<br/>+ task 描述"]
+    C --> D["Sub-Agent 读取<br/>sub-rules.md<br/>解析职责边界"]
+    D --> E["读取 task 描述<br/>和输入参数"]
+    E --> F["执行单一功能任务<br/>（编码 / 测试 / 文案...）"]
+    F --> G{"执行成功<br/>且测试通过?"}
+    G -- "&#x274C; 否" --> H["写入错误日志<br/>到 logs/ 目录"]
+    H --> I["更新 task.json<br/>状态为失败"]
+    I --> J(["退出 CLI 进程"])
+    G -- "&#x2705; 是" --> K["git add + commit<br/>提交本任务变更"]
+    K --> L["更新 progress.txt<br/>更新 task.json 状态"]
+    L --> M["写入执行日志<br/>到 logs/ 目录"]
+    M --> J
+
+    style A fill:#DCFCE7,stroke:#22C55E,stroke-width:2px
+    style J fill:#FEE2E2,stroke:#EF4444,stroke-width:2px
+    style G fill:#FEF9C3,stroke:#EAB308,stroke-width:2px
+    style H fill:#FEE2E2,stroke:#EF4444,stroke-width:1.5px
+    style K fill:#D1FAE5,stroke:#10B981,stroke-width:1.5px
+    </div>
+    <p class="mermaid-caption">图 4-2 Sub-Agent 生命周期流程图</p>
+  </div>
+
+  <h2 id="s4-5">4.5 终端管理层（tmux 集成）</h2>
+  <p>tmux 作为终端管理层是整个系统的核心基础设施之一。Master Agent 通过 tmux 实现所有 Agent CLI 实例的创建、管理和通信。具体集成方式：Master Agent 使用 <code>tmux new-session</code> 创建主会话，使用 <code>tmux new-window</code> 为每个 Sub-Agent 创建独立的终端窗口。窗口命名采用约定格式 <code>agent_{角色}_{序号}</code>，例如 <code>agent_pm_1</code> 表示第一个产品经理 Agent，<code>agent_dev_3</code> 表示第三个开发工程师 Agent。通过 <code>tmux send-keys</code> 命令可以向指定窗口发送文本指令，实现 Master Agent 与 Sub-Agent 之间的实时通信。tmux 的会话持久化特性确保即使 SSH 连接断开或 Web 面板关闭，所有 Agent 进程仍在后台继续运行。Web 管理面板通过集成 tmux 终端视图，让用户可以实时查看任意 Agent 的终端输出。</p>
+
+  <h2 id="s4-6">4.6 进程监控与告警层（OpenClaw 集成）</h2>
+  <p>OpenClaw 是独立于 Agent 执行系统的外部监控进程，作为最后一道安全防线存在。它的独立性至关重要——即使 Master Agent 自身出现异常崩溃，OpenClaw 仍能正常工作并发送告警通知。OpenClaw 的核心监控能力包括三个方面：进程存活检测，定期检查所有 Claude Code CLI 进程是否仍在运行；执行超时检测，对每个 task 设定最大执行时间，超时则标记为异常；资源使用监控，监控 CPU、内存、磁盘等资源使用情况，防止 Agent 进程失控占用过多系统资源。检测到异常时，OpenClaw 通过移动端推送渠道（企业微信、钉钉、Slack）发送告警通知，通知用户需要人工介入。同时 OpenClaw 支持 Master Agent 的反向通知：当 Master Agent 发现某个 task 执行失败时，会主动通知 OpenClaw 触发告警并暂停整个任务流，等待人工给出修复方案。</p>
+
+  <h2 id="s4-7">4.7 Git 版本管理集成</h2>
+  <p>Git 版本管理是本系统工程化闭环的关键环节。每个 Sub-Agent 在成功完成一个 task 且测试通过后，必须将本任务所做的所有代码变更通过 git commit 提交到版本控制系统。提交信息遵循约定格式：<code>[task-{id}] {角色}: {简要描述}</code>，例如 <code>[task-023] senior-developer: 实现用户登录页面布局和样式</code>。如果任务执行失败，Sub-Agent 也会记录失败信息并更新 task.json 中的状态，但不会进行 git commit。Master Agent 在整个任务流完成后，会生成一份完整的执行报告，包含每个 task 的执行状态、git commit hash、执行时间等元数据。这种设计确保了整个开发过程的每一步都可追溯到具体的 commit，极大地方便了代码审查和问题排查。</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第五章  端到端工作流
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch5">
+  <div class="section-tag">CHAPTER 05</div>
+  <h1 class="chapter"><span class="num">05</span> 端到端工作流</h1>
+  <p class="lead no-indent">从用户输入需求到全部任务完成，三大阶段：需求定义、任务执行、失败恢复。</p>
+
+  <h2 id="s5-1">5.1 第一阶段：需求定义（BDD 精炼）</h2>
+  <p>需求定义是整个工作流的起点，也是决定项目成败的关键阶段。当用户通过 Web 管理面板下达原始需求后，Master Agent 会作为编排者/老板，通过 tmux 创建一个"产品经理"Sub-Agent（Claude Code CLI 实例），并将原始需求传递给它。Product Manager Agent 的核心职责是将模糊的大需求拆解为精确的原子任务列表，并通过 BDD 方式与用户反复沟通，确保每个功能细节都被准确定义，彻底杜绝需求模糊。</p>
+
+  <h3>5.1.1 BDD 需求精炼流程</h3>
+  <p>Product Manager Agent 采用行为驱动开发（BDD）方法与用户进行结构化沟通。对于每个功能需求，PM Agent 会使用 Given-When-Then 格式描述预期的行为：</p>
+  <ul class="step-list">
+    <li><strong>Given（前置条件）</strong>：描述系统当前状态，例如"用户已登录且在首页"</li>
+    <li><strong>When（操作触发）</strong>：描述用户或系统的操作，例如"用户点击搜索按钮并输入关键词"</li>
+    <li><strong>Then（预期结果）</strong>：描述系统的响应，例如"展示搜索结果列表，每条结果包含标题、摘要和链接"</li>
+    <li><strong>沟通迭代</strong>：PM Agent 将 BDD 描述展示给用户确认，用户可以提出修改意见，PM Agent 据此调整并重新描述，直到用户完全确认无误</li>
+    <li><strong>任务拆解</strong>：确认后的每个功能被拆解为一个或多个原子 task，每个 task 有明确的输入、输出、验收标准</li>
+  </ul>
+
+  <h3>5.1.2 测试脚本编写</h3>
+  <p>需求精炼完成后，PM Agent 还需要为每个 task 编写对应的测试脚本。测试脚本的类型取决于任务的性质：对于前端 UI 任务，可以使用 Playwright CLI 进行浏览器自动化测试，包括页面元素验证、交互操作模拟、截图对比等；对于 API 接口任务，编写 HTTP 请求测试脚本验证接口的请求参数、响应格式和状态码；对于数据处理任务，编写输入输出对比测试确保数据转换的正确性。测试脚本和 BDD 描述一起构成 task.json 的完整内容，确保每个 task 都有清晰的"怎么做"和"怎么验证"。</p>
+
+  <h3>5.1.3 task.json 交付</h3>
+  <p>当所有 task 的 BDD 描述和测试脚本都经过用户确认后，PM Agent 将完整的 task.json 交付给 Master Agent。一个典型的中型项目可能包含几十个 task，大型项目甚至可以有上百个 task。task.json 中每个 task 包含：任务 ID、任务描述、BDD 行为定义、测试脚本路径、前置依赖（依赖哪些其他 task 先完成）、建议的 Sub-Agent 角色类型、优先级、预计难度等信息。这个 task.json 将成为后续执行阶段的核心输入。</p>
+
+  <h2 id="s5-2">5.2 第二阶段：任务执行（Master Agent 调度）</h2>
+  <p>Master Agent 收到完整的 task.json 后，进入调度执行阶段。作为整个系统的"大脑"，Master Agent 需要进行智能决策：分析所有 task 之间的依赖关系，构建有向无环图（DAG）；确定哪些 task 可以并行执行、哪些必须串行等待；为每个 task 分配最合适的 Sub-Agent 角色类型；监控每个 task 的执行状态和进度。</p>
+
+  <h3>5.2.1 调度策略</h3>
+  <p>Master Agent 的调度策略遵循以下原则：首先执行没有前置依赖的 task，按照优先级从高到低排序；对于可以并行的 task，Master Agent 同时创建多个 Sub-Agent CLI 实例并行执行，充分利用系统资源；对于有依赖关系的 task，只有当其所有前置 task 都成功完成后才开始执行；高风险 task（如涉及数据库迁移、架构变更等）安排在低风险 task 之后，以便积累更多上下文信息。Master Agent 可以同时管理多个并行的 Sub-Agent，通过 tmux 窗口分别监控它们的执行状态。</p>
+
+  <h3>5.2.2 单任务执行流程</h3>
+  <p>每个 task 的执行遵循标准化流程：Master Agent 通过 tmux 创建新的 Claude Code CLI 实例，注入角色定义和 Harness 约束，将 task 描述发送给 Sub-Agent；Sub-Agent 读取 task 描述和相关输入文件，执行具体的业务逻辑（编码、测试、分析等）；执行完成后运行对应的测试脚本验证结果；如果测试通过，Sub-Agent 执行 git commit 提交代码变更，更新 progress.txt 和 task.json 中的任务状态为"已完成"，写入执行日志，然后退出 CLI 进程；如果测试失败，Sub-Agent 记录错误信息，更新 task.json 状态为"失败"，写入错误日志，然后退出。</p>
+
+  <h2 id="s5-3">5.3 第三阶段：失败恢复（人工介入）</h2>
+  <p>任务执行过程中不可避免地会出现失败情况。本系统设计了完善的失败恢复机制，确保单个任务的失败不会导致整个项目流产，同时通过人工介入解决 Agent 无法自主处理的问题。</p>
+
+  <div class="mermaid-wrapper">
+    <div class="mermaid">
+flowchart TD
+    A["Sub-Agent 执行 task<br/>测试失败或执行异常"] --> B["Sub-Agent 记录失败信息<br/>更新 task.json 状态为失败<br/>写入错误日志"]
+    B --> C["Sub-Agent 退出 CLI 进程"]
+    C --> D["Master Agent 检测到<br/>task 失败"]
+    D --> E["Master Agent<br/>暂停整个任务流"]
+    E --> F["Master Agent 通知<br/>OpenClaw 触发告警"]
+    F --> G["OpenClaw 推送<br/>移动端告警通知"]
+    G --> H["用户收到告警<br/>（企微/钉钉/Slack）"]
+    H --> I["用户通过 Web 面板<br/>或终端查看失败详情"]
+    I --> J["用户分析原因<br/>给出修复方案"]
+    J --> K["用户将修复方案<br/>反馈给 Master Agent"]
+    K --> L["Master Agent 从<br/>失败的 task 开始"]
+    L --> M["用新方案重新派定<br/>Sub-Agent 执行任务"]
+    M --> N{"执行成功?"}
+    N -- "是" --> O["继续后续任务流"]
+    N -- "否" --> F
+
+    style A fill:#FEF9C3,stroke:#EAB308,stroke-width:1.5px
+    style E fill:#FEE2E2,stroke:#EF4444,stroke-width:2px
+    style G fill:#FEF3C7,stroke:#F59E0B,stroke-width:2px
+    style J fill:#DBEAFE,stroke:#3B82F6,stroke-width:2px
+    style O fill:#DCFCE7,stroke:#22C55E,stroke-width:2px
+    </div>
+    <p class="mermaid-caption">图 5-1 失败恢复与人工介入流程图</p>
+  </div>
+
+  <h3>5.3.1 失败处理策略</h3>
+  <p>当 Sub-Agent 执行任务失败时，系统采取以下处理策略：首先，Sub-Agent 会将失败信息详细记录到 logs/ 目录下的日志文件中，包括失败原因、错误堆栈、已完成的步骤等，方便后续排查；其次，更新 task.json 中对应 task 的状态为"失败"；然后 Sub-Agent 自动退出 CLI 进程。Master Agent 在检测到 task 失败后，立即暂停整个任务流，不再启动新的 task，确保不会在错误状态下继续执行产生更多问题。</p>
+
+  <h3>5.3.2 OpenClaw 告警机制</h3>
+  <p>Master Agent 暂停任务流后，会通知 OpenClaw 触发告警。OpenClaw 通过配置的移动端推送渠道（企业微信、钉钉、Slack）向用户发送告警通知，告警内容包含：失败 task 的 ID 和描述、失败原因摘要、失败时间、当前整体进度等信息。用户收到告警后，可以通过手机快速了解问题情况，或回到电脑前通过 Web 管理面板查看详细的失败日志和终端输出。</p>
+
+  <h3>5.3.3 人工介入与恢复</h3>
+  <p>人工介入是失败恢复的核心环节。用户通过 Web 管理面板或终端查看失败详情后，分析失败原因并给出修复方案。修复方案可以是：修改 task 描述或需求、提供额外的上下文信息、调整 Harness 约束、甚至直接修改代码。用户将修复方案反馈给 Master Agent 后，Master Agent 从上一个失败的 task 开始，使用新的方案重新派定 Sub-Agent 来执行该任务。如果再次失败，系统会再次触发告警等待人工介入，直到问题被解决。这种"自动执行 + 人工兜底"的模式确保了系统的可靠性和灵活性。</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第六章  文件格式规范
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch6">
+  <div class="section-tag">CHAPTER 06</div>
+  <h1 class="chapter"><span class="num">06</span> 文件格式规范</h1>
+  <p class="lead no-indent">定义项目目录结构、所有核心文件的格式规范与读写规则。</p>
+
+  <h2>6.1 项目目录结构</h2>
+  <p>以下为本系统的完整项目文件结构，包含了所有核心组件、配置文件和数据目录：</p>
+
+  <div class="file-tree">
+<span class="dir">agent-automation-system/</span>
+├── <span class="highlight">main_agent.py</span>                 <span class="comment"># 主Agent核心调度程序</span>
+├── <span class="dir">sub_agents/</span>                   <span class="comment"># Sub-Agent 执行单元目录</span>
+│   ├── <span class="highlight">base_subagent.py</span>          <span class="comment"># Sub-Agent 基类（继承 Claude Code CLI）</span>
+│   ├── <span class="file">browser_task_agent.py</span>     <span class="comment"># 浏览器自动化执行单元</span>
+│   ├── <span class="file">data_process_agent.py</span>     <span class="comment"># 数据处理执行单元</span>
+│   └── <span class="file">api_request_agent.py</span>      <span class="comment"># API 接口请求执行单元</span>
+├── <span class="dir">harness/</span>                     <span class="comment"># Harness 行为约束规则目录</span>
+│   ├── <span class="highlight">main-rules.md</span>             <span class="comment"># Master Agent 角色约束（编排者/老板）</span>
+│   ├── <span class="highlight">sub-rules.md</span>              <span class="comment"># Sub-Agent 通用角色约束</span>
+│   └── <span class="highlight">validate-rules.md</span>         <span class="comment"># 验证规则（测试验收标准）</span>
+├── <span class="dir">data/</span>                        <span class="comment"># 运行时数据目录</span>
+│   ├── <span class="highlight">progress.txt</span>              <span class="comment"># 全局任务进度文件</span>
+│   ├── <span class="highlight">memory.md</span>                 <span class="comment"># 知识累积 / 上下文记忆文件</span>
+│   └── <span class="dir">backup/</span>                   <span class="comment"># 自动备份目录</span>
+├── <span class="dir">logs/</span>                        <span class="comment"># 日志目录</span>
+│   ├── <span class="file">main_agent.log</span>            <span class="comment"># Master Agent 运行日志</span>
+│   ├── <span class="file">sub_agent_exec.log</span>        <span class="comment"># Sub-Agent 执行日志</span>
+│   └── <span class="file">error.log</span>                 <span class="comment"># 错误日志</span>
+├── <span class="dir">openclaw/</span>                    <span class="comment"># OpenClaw 进程监控组件</span>
+│   ├── <span class="file">monitor.py</span>                <span class="comment"># 进程监控核心逻辑</span>
+│   ├── <span class="file">alert.py</span>                  <span class="comment"># 告警推送逻辑</span>
+│   └── <span class="file">config.yaml</span>               <span class="comment"># OpenClaw 配置文件</span>
+└── <span class="highlight">requirements.txt</span>              <span class="comment"># Python 依赖清单</span>
+  </div>
+
+  <h2>6.2 task.json 格式规范</h2>
+  <p>task.json 是 Product Manager Agent 输出的核心交付物，也是 Master Agent 执行调度的数据基础。它包含所有原子任务的完整定义。</p>
+
+  <div class="code-block">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span class="code-filename">data/task.json</span>
+    </div>
+<pre><code>{
+  "project_name": "电商平台重构项目",
+  "created_by": "Product Manager Agent",
+  "created_at": "2026-05-13T10:30:00Z",
+  "total_tasks": 48,
+  "tasks": [
+    {
+      "id": "task-001",
+      "title": "用户登录页面 UI 实现",
+      "description": "基于 Figma 设计稿实现用户登录页面，包含用户名/密码输入框、登录按钮、忘记密码链接",
+      "bdd": {
+        "given": "用户未登录，访问登录页面 URL /login",
+        "when": "页面加载完成",
+        "then": "展示登录表单：用户名输入框、密码输入框（带显示/隐藏切换）、登录按钮（蓝色主色调）、忘记密码链接、注册引导链接"
+      },
+      "test_script": "tests/test_login_ui.py",
+      "dependencies": [],
+      "suggested_role": "senior-developer",
+      "priority": "high",
+      "estimated_complexity": "medium",
+      "status": "pending"
+    },
+    {
+      "id": "task-002",
+      "title": "登录表单 Playwright 自动化测试",
+      "description": "使用 Playwright CLI 编写登录表单的 E2E 自动化测试，验证表单交互、输入验证和提交逻辑",
+      "bdd": {
+        "given": "用户在登录页面",
+        "when": "用户输入正确的用户名和密码并点击登录",
+        "then": "页面跳转到首页 /dashboard，展示用户头像和欢迎信息"
+      },
+      "test_script": "tests/e2e/test_login_flow.py",
+      "dependencies": ["task-001"],
+      "suggested_role": "test-engineer",
+      "priority": "high",
+      "estimated_complexity": "medium",
+      "status": "pending"
+    }
+  ]
+}</code></pre>
+  </div>
+
+  <h2>6.3 progress.txt 格式规范</h2>
+  <p>progress.txt 是全局任务进度的实时记录文件，由各 Sub-Agent 在完成每个 task 后更新。它采用结构化文本格式，便于人类阅读和程序解析。</p>
+
+  <div class="code-block">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span class="code-filename">data/progress.txt</span>
+    </div>
+<pre><code># ============================================
+# Project: 电商平台重构项目
+# Updated: 2026-05-13 15:42:18
+# Progress: 12 / 48 tasks completed
+# ============================================
+
+[task-001] 用户登录页面 UI 实现
+  Status:    COMPLETED
+  Role:      senior-developer
+  Started:   2026-05-13 11:05:00
+  Finished:  2026-05-13 11:32:15
+  Git SHA:   a3f7b2c
+  Git Msg:   [task-001] senior-developer: 实现用户登录页面布局和样式
+
+[task-002] 登录表单 Playwright 自动化测试
+  Status:    COMPLETED
+  Role:      test-engineer
+  Started:   2026-05-13 11:33:00
+  Finished:  2026-05-13 12:01:44
+  Git SHA:   e8d4f1a
+  Git Msg:   [task-002] test-engineer: 编写登录表单E2E自动化测试
+
+[task-003] 用户注册页面 UI 实现
+  Status:    FAILED
+  Role:      senior-developer
+  Started:   2026-05-13 13:00:00
+  Finished:  2026-05-13 13:45:22
+  Error:     设计稿中注册表单验证规则不明确，邮件格式验证存在歧义
+  Retry:     PENDING_HUMAN_INTERVENTION</code></pre>
+  </div>
+
+  <h2>6.4 Harness 规则文件规范</h2>
+
+  <h3>6.4.1 main-rules.md（Master Agent 约束）</h3>
+  <p>main-rules.md 定义了 Master Agent 作为编排者/老板的角色特征和行为约束。以下为核心内容：</p>
+  <div class="code-block">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span class="code-filename">harness/main-rules.md</span>
+    </div>
+<pre><code># ============================================
+# Master Agent Harness - 编排者/老板
+# ============================================
+
+## Role Identity
+You are the Orchestrator (Boss) of this multi-agent system.
+Your role is to make decisions, coordinate tasks, and manage Sub-Agents.
+You MUST NOT execute any specific business logic yourself.
+
+## Core Responsibilities
+1. Receive user requirements and coordinate with Product Manager Agent
+2. Receive task.json from PM Agent and analyze task dependencies
+3. Decide which Sub-Agent role is best suited for each task
+4. Create Sub-Agent CLI instances via tmux for task execution
+5. Monitor global execution progress in real-time
+6. Handle task failures: pause workflow, alert OpenClaw, wait for human intervention
+7. Resume execution from the last failed task after receiving fix plan
+
+## Constraints
+- NEVER write code, run tests, or do data analysis yourself
+- ALWAYS delegate specific work to appropriately roled Sub-Agents
+- PAUSE the entire task flow when any task fails
+- ALWAYS commit via git after each successful task completion
+- Update progress.txt and task.json status after each task</code></pre>
+  </div>
+
+  <h3>6.4.2 sub-rules.md（Sub-Agent 通用约束）</h3>
+  <div class="code-block">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span class="code-filename">harness/sub-rules.md</span>
+    </div>
+<pre><code># ============================================
+# Sub-Agent Harness - General Rules
+# ============================================
+
+## Role Identity
+You are a specialized Sub-Agent with a specific role assignment.
+Your role will be specified by the Master Agent when you are created.
+Stick strictly to your assigned role and responsibility scope.
+
+## Lifecycle
+1. Read your role assignment and Harness constraints from Master Agent
+2. Read task description from task.json (assigned task ID)
+3. Read relevant input files from workspace
+4. Execute the specific task within your role scope
+5. Run the associated test script to verify your work
+6. If test passes: git commit, update progress.txt, update task.json, then EXIT
+7. If test fails: log error, update task.json status to FAILED, then EXIT
+
+## Constraints
+- NEVER modify tasks outside your assigned scope
+- NEVER skip the test verification step
+- ALWAYS git commit with format: [task-{id}] {role}: {description}
+- ALWAYS update progress.txt before exiting
+- Max execution time per task: 30 minutes (configurable)</code></pre>
+  </div>
+
+  <h2>6.5 OpenClaw 配置规范</h2>
+  <div class="code-block">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span class="code-filename">openclaw/config.yaml</span>
+    </div>
+<pre><code># OpenClaw Monitor Configuration
+monitor:
+  check_interval: 30          # 进程检查间隔（秒）
+  timeout_per_task: 1800      # 单任务超时时间（秒）
+  max_cpu_percent: 80         # CPU 使用率阈值
+  max_memory_mb: 2048         # 内存使用阈值（MB）
+
+alert:
+  channels:
+    - name: wecom
+      type: webhook
+      url: ${WECOM_WEBHOOK_URL}
+    - name: dingtalk
+      type: webhook
+      url: ${DINGTALK_WEBHOOK_URL}
+    - name: slack
+      type: webhook
+      url: ${SLACK_WEBHOOK_URL}
+  retry: 3
+  retry_interval: 60
+
+processes:
+  - name: master-agent
+    pattern: "claude.*main_agent"
+    critical: true
+  - name: sub-agents
+    pattern: "claude.*sub_agent"
+    critical: false</code></pre>
+  </div>
+
+  <h2>6.6 日志文件规范</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>文件路径</th><th>写入者</th><th>内容格式</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>logs/main_agent.log</code></td>
+          <td>Master Agent</td>
+          <td>带时间戳的结构化日志</td>
+          <td>记录 Master Agent 的所有调度决策、Sub-Agent 创建/销毁、任务分配等操作</td>
+        </tr>
+        <tr>
+          <td><code>logs/sub_agent_exec.log</code></td>
+          <td>各 Sub-Agent</td>
+          <td>带时间戳 + Agent ID 的结构化日志</td>
+          <td>记录每个 Sub-Agent 的执行过程，包括开始时间、结束时间、执行结果、git commit hash 等</td>
+        </tr>
+        <tr>
+          <td><code>logs/error.log</code></td>
+          <td>所有组件</td>
+          <td>带时间戳 + 级别的错误日志</td>
+          <td>记录所有 ERROR 和 CRITICAL 级别的错误信息，包含错误堆栈和上下文</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 6-1 日志文件规范</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第七章  异常处理
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch7">
+  <div class="section-tag">CHAPTER 07</div>
+  <h1 class="chapter"><span class="num">07</span> 异常处理机制</h1>
+  <p class="lead no-indent">覆盖任务失败、进程崩溃、超时、资源耗尽等异常场景的完整处理策略。</p>
+
+  <h2>7.1 异常分类与处理策略</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>异常类型</th><th>触发条件</th><th>检测方</th><th>处理策略</th><th>恢复方式</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>任务执行失败</strong></td>
+          <td>Sub-Agent 执行结果未通过测试脚本验证</td>
+          <td>Sub-Agent 自身</td>
+          <td>记录错误日志，更新 task.json 状态为 FAILED，退出进程</td>
+          <td>Master Agent 暂停任务流 → OpenClaw 告警 → 等待人工介入 → 从失败 task 重新执行</td>
+        </tr>
+        <tr>
+          <td><strong>Sub-Agent 进程崩溃</strong></td>
+          <td>Claude Code CLI 进程意外退出</td>
+          <td>OpenClaw 进程监控</td>
+          <td>检测到进程消失，触发告警通知</td>
+          <td>Master Agent 重新创建 Sub-Agent 实例，从同一 task 重新开始执行</td>
+        </tr>
+        <tr>
+          <td><strong>Master Agent 进程崩溃</strong></td>
+          <td>Master Agent CLI 进程意外退出</td>
+          <td>OpenClaw 进程监控</td>
+          <td>触发 CRITICAL 级别告警，通知用户立即介入</td>
+          <td>用户重启 Master Agent，系统从 progress.txt 中读取断点状态，从上次成功的 task 之后继续执行</td>
+        </tr>
+        <tr>
+          <td><strong>任务执行超时</strong></td>
+          <td>单个 task 执行时间超过配置的最大时长</td>
+          <td>OpenClaw 超时检测</td>
+          <td>终止超时的 Sub-Agent 进程，标记任务为超时失败</td>
+          <td>Master Agent 暂停 → 告警 → 人工介入 → 可考虑将 task 进一步拆分或增加超时时间</td>
+        </tr>
+        <tr>
+          <td><strong>资源耗尽</strong></td>
+          <td>CPU/内存/磁盘使用超过阈值</td>
+          <td>OpenClaw 资源监控</td>
+          <td>暂停新的任务启动，等待资源释放</td>
+          <td>等正在执行的任务完成后资源自动释放；必要时用户手动清理</td>
+        </tr>
+        <tr>
+          <td><strong>Git 操作失败</strong></td>
+          <td>git commit/push 失败</td>
+          <td>Sub-Agent 自身</td>
+          <td>记录错误日志，重试最多 3 次</td>
+          <td>如果重试仍失败，标记任务为 FAILED，等待人工介入</td>
+        </tr>
+        <tr>
+          <td><strong>tmux 会话异常</strong></td>
+          <td>tmux server 意外退出或会话丢失</td>
+          <td>OpenClaw + Master Agent</td>
+          <td>检测到 tmux 进程消失，触发告警</td>
+          <td>重启 tmux server，Master Agent 重新创建必要的会话和窗口</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 7-1 异常分类与处理策略</p>
+
+  <h2>7.2 断点恢复机制</h2>
+  <p>断点恢复是本系统高可用性的核心保障。由于所有状态都持久化在文件系统（progress.txt、task.json、memory.md）和 Git 版本控制中，任何组件崩溃后都可以从断点恢复。Master Agent 崩溃后的恢复流程最为关键：OpenClaw 检测到 Master Agent 进程消失后，立即发送 CRITICAL 告警；用户收到告警后重启 Master Agent CLI；Master Agent 启动后首先读取 progress.txt 获取已完成的任务列表和最后一个失败的任务；然后读取 task.json 获取完整任务队列；从失败的任务（或下一个待执行的任务）开始恢复调度。整个恢复过程是自动化的，用户只需要重启 Master Agent 进程即可，无需手动干预恢复逻辑。</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第八章  开发计划
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch8">
+  <div class="section-tag">CHAPTER 08</div>
+  <h1 class="chapter"><span class="num">08</span> 开发计划</h1>
+  <p class="lead no-indent">分四个迭代周期，从核心框架到完整系统的渐进式开发路径。</p>
+
+  <h2>8.1 迭代规划</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>迭代</th><th>周期</th><th>核心目标</th><th>交付物</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>Iter 1</strong></td>
+          <td>2 周</td>
+          <td>核心框架搭建：Master Agent + 单 Sub-Agent + tmux 集成 + 文件系统状态层</td>
+          <td>main_agent.py, base_subagent.py, tmux 集成模块, progress.txt, harness 文件</td>
+        </tr>
+        <tr>
+          <td><strong>Iter 2</strong></td>
+          <td>2 周</td>
+          <td>多 Agent 并行调度 + Git 集成 + Product Manager Agent + BDD 工作流</td>
+          <td>task.json 格式, PM Agent, git 集成模块, BDD 交互流程, 角色化 Harness</td>
+        </tr>
+        <tr>
+          <td><strong>Iter 3</strong></td>
+          <td>2 周</td>
+          <td>Web 管理面板 + OpenClaw 监控告警 + 失败恢复机制</td>
+          <td>Web 前端 + 后端 API, openclaw/monitor.py, alert.py, 移动端告警集成</td>
+        </tr>
+        <tr>
+          <td><strong>Iter 4</strong></td>
+          <td>1-2 周</td>
+          <td>完整测试 + 性能优化 + 文档完善 + 部署自动化</td>
+          <td>完整测试套件, 性能基准, 部署脚本, 用户手册</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 8-1 迭代规划总览</p>
+
+  <h2>8.2 技术栈</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>领域</th><th>技术选型</th><th>选型理由</th></tr></thead>
+      <tbody>
+        <tr><td>Agent 执行引擎</td><td>Claude Code CLI</td><td>强大的代码理解和生成能力，原生支持终端交互</td></tr>
+        <tr><td>终端管理</td><td>tmux</td><td>会话持久化、窗口管理、send-keys 通信能力</td></tr>
+        <tr><td>进程监控</td><td>OpenClaw (Python)</td><td>独立进程、支持多种告警渠道、可配置检测规则</td></tr>
+        <tr><td>版本管理</td><td>Git</td><td>行业标准、支持原子提交、便于代码审查和回溯</td></tr>
+        <tr><td>Web 前端</td><td>React / Vue</td><td>成熟的 SPA 框架，丰富的 UI 组件生态</td></tr>
+        <tr><td>Web 后端</td><td>Python FastAPI</td><td>高性能异步框架，原生 WebSocket 支持</td></tr>
+        <tr><td>测试工具</td><td>Playwright CLI / pytest</td><td>跨浏览器自动化测试，Python 生态标准测试框架</td></tr>
+        <tr><td>配置管理</td><td>YAML</td><td>人类可读的配置格式，广泛支持</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 8-2 技术栈选型</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第九章  测试策略
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch9">
+  <div class="section-tag">CHAPTER 09</div>
+  <h1 class="chapter"><span class="num">09</span> 测试策略</h1>
+  <p class="lead no-indent">多层次测试覆盖：单元测试、集成测试、BDD 验收测试、端到端工作流测试。</p>
+
+  <h2>9.1 测试金字塔</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>测试层级</th><th>覆盖范围</th><th>工具</th><th>执行频率</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>单元测试</strong></td>
+          <td>各模块的核心函数：tmux 会话管理、文件读写、Git 操作、进程检测</td>
+          <td>pytest</td>
+          <td>每次提交</td>
+        </tr>
+        <tr>
+          <td><strong>集成测试</strong></td>
+          <td>组件间交互：Master Agent 与 Sub-Agent 的调度通信、tmux 会话创建销毁、OpenClaw 告警触发</td>
+          <td>pytest + tmux fixture</td>
+          <td>每日构建</td>
+        </tr>
+        <tr>
+          <td><strong>BDD 验收测试</strong></td>
+          <td>每个 task 的验收标准：Given-When-Then 行为验证，包含 UI 截图对比</td>
+          <td>Playwright CLI / pytest-bdd</td>
+          <td>每个 task 完成时</td>
+        </tr>
+        <tr>
+          <td><strong>端到端测试</strong></td>
+          <td>完整工作流：需求输入 → PM 拆解 → Master 调度 → Sub-Agent 执行 → 全部完成</td>
+          <td>自动化脚本 + Claude Code CLI</td>
+          <td>每周 / 发版前</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 9-1 测试金字塔</p>
+
+  <h2>9.2 测试驱动开发流程</h2>
+  <p>本系统采用严格的 TDD 开发流程：在实现任何功能模块之前，先编写对应的测试用例；运行测试确认测试失败（红灯）；编写最小可用的实现代码使测试通过（绿灯）；重构代码确保质量（蓝灯）。这种流程确保每个功能模块都有充分的测试覆盖。对于 Sub-Agent 的开发，测试分为两层：第一层是 Sub-Agent 本身的功能测试（由 PM Agent 在需求阶段编写的测试脚本）；第二层是系统层面的集成测试（验证 Master Agent 能正确调度 Sub-Agent 并处理各种异常情况）。</p>
+</div>
+
+<div class="divider"></div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     第十章  部署运维
+     ══════════════════════════════════════════════════════════════ -->
+<div class="doc-section" id="ch10">
+  <div class="section-tag">CHAPTER 10</div>
+  <h1 class="chapter"><span class="num">10</span> 部署运维指南</h1>
+  <p class="lead no-indent">环境要求、部署步骤、日常运维、监控告警配置。</p>
+
+  <h2>10.1 环境要求</h2>
+  <div class="table-wrapper">
+    <table>
+      <thead><tr><th>依赖项</th><th>最低版本</th><th>用途</th></tr></thead>
+      <tbody>
+        <tr><td>Python</td><td>3.10+</td><td>主程序运行环境</td></tr>
+        <tr><td>Node.js</td><td>18+</td><td>Web 前端构建（如使用 React/Vue）</td></tr>
+        <tr><td>tmux</td><td>3.2+</td><td>终端会话管理</td></tr>
+        <tr><td>Git</td><td>2.30+</td><td>版本管理</td></tr>
+        <tr><td>Claude Code CLI</td><td>最新版</td><td>Agent 执行引擎</td></tr>
+        <tr><td>Playwright</td><td>1.40+</td><td>浏览器自动化测试（可选）</td></tr>
+        <tr><td>操作系统</td><td>Ubuntu 22.04+ / macOS 13+</td><td>推荐 Linux 环境</td></tr>
+        <tr><td>内存</td><td>8GB+</td><td>支持多 Agent 并行执行</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="table-caption">表 10-1 环境要求</p>
+
+  <h2>10.2 快速部署</h2>
+  <div class="code-block">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span class="code-filename">Terminal</span>
+    </div>
+<pre><code># 1. 克隆项目
+git clone https://github.com/your-org/agent-automation-system.git
+cd agent-automation-system
+
+# 2. 安装 Python 依赖
+pip install -r requirements.txt
+
+# 3. 验证 Claude Code CLI 可用
+claude --version
+
+# 4. 配置 OpenClaw 告警渠道
+cp openclaw/config.yaml.example openclaw/config.yaml
+# 编辑 config.yaml 填入 webhook URL
+
+# 5. 初始化项目数据目录
+mkdir -p data/backup logs
+
+# 6. 启动系统
+python main_agent.py
+
+# 7. 访问 Web 管理面板
+# 浏览器打开 http://localhost:8080</code></pre>
+  </div>
+
+  <h2>10.3 日常运维</h2>
+  <ul class="feature-list">
+    <li><strong>状态检查</strong>：通过 Web 管理面板查看全局 Agent 状态和任务进度，或通过 tmux attach 命令直接连接到任意 Agent 终端查看实时输出</li>
+    <li><strong>日志查看</strong>：通过 Web 面板的日志页面或直接查看 logs/ 目录下的日志文件，使用 tail -f 实时跟踪</li>
+    <li><strong>告警处理</strong>：收到 OpenClaw 移动端告警后，通过 Web 面板查看失败详情，分析原因并给出修复方案</li>
+    <li><strong>数据备份</strong>：系统自动将 data/ 目录下的关键文件定期备份到 data/backup/，同时 Git 提交记录本身就是代码变更的完整备份</li>
+    <li><strong>系统重启</strong>：Master Agent 支持断点恢复，重启后自动从 progress.txt 中读取最后状态并继续执行</li>
+    <li><strong>资源监控</strong>：OpenClaw 持续监控系统资源使用情况，超出阈值时自动告警</li>
+  </ul>
+</div>
+
+</div><!-- end content -->
+</div><!-- end main-container -->
+
+<!-- ─── Footer ─── -->
+<footer style="background:var(--primary);color:#94A3B8;padding:40px 32px;text-align:center;font-size:13px;">
+  <p style="text-indent:0;color:#64748B;">Agent Automation System PRD v2.0 &mdash; 2026.05.13</p>
+  <p style="text-indent:0;color:#475569;margin-top:8px;">This document is generated as a single self-contained HTML file. All diagrams are rendered inline via Mermaid.js.</p>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'base',
+  themeVariables: {
+    primaryColor: '#E0E7FF',
+    primaryTextColor: '#1E293B',
+    primaryBorderColor: '#818CF8',
+    lineColor: '#94A3B8',
+    secondaryColor: '#FEF3C7',
+    tertiaryColor: '#F0FDF4',
+    fontSize: '14px',
+    fontFamily: 'Inter, Noto Sans SC, sans-serif'
+  },
+  flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+  sequence: { useMaxWidth: true },
+  stateDiagram: { useMaxWidth: true }
+});
+
+// Sidebar active state
+const sections = document.querySelectorAll('[id]');
+const sidebarLinks = document.querySelectorAll('.sidebar a');
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.getAttribute('id');
+      sidebarLinks.forEach(link => {
+        link.classList.toggle('active', link.getAttribute('href') === '#' + id);
+      });
+    }
+  });
+}, { rootMargin: '-80px 0px -60% 0px' });
+sections.forEach(s => { if (s.id) observer.observe(s); });
+</script>
+
+</body>
+</html>

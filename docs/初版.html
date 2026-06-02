@@ -1,0 +1,1743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分层Agent自动化调度系统实现方案 | 主从架构+无状态执行+外部监控</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入代码高亮 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/markdown.min.js"></script>
+    <!-- 自定义配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#0E2B5C',
+                        accent: '#36CFC9',
+                        dark: '#0F172A',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Consolas', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+            }
+            .scrollbar-hide {
+                -ms-overflow-style: none;
+                scrollbar-width: none;
+            }
+            .code-block pre {
+                border-radius: 0.5rem;
+                padding: 1rem;
+                margin: 0.5rem 0;
+                overflow-x: auto;
+            }
+            .anchor-offset {
+                scroll-margin-top: 5rem;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+    <!-- 固定导航栏 -->
+    <header class="fixed top-0 left-0 right-0 bg-dark text-white z-50 shadow-lg">
+        <div class="container mx-auto px-4 py-3 flex flex-wrap items-center justify-between">
+            <h1 class="text-xl font-bold md:text-2xl">Agent自动化调度系统实现方案</h1>
+            <nav class="hidden md:flex space-x-6 text-sm font-medium">
+                <a href="#overview" class="hover:text-accent transition-colors">架构总览</a>
+                <a href="#core" class="hover:text-accent transition-colors">分层详解</a>
+                <a href="#workflow" class="hover:text-accent transition-colors">工作流程</a>
+                <a href="#compare" class="hover:text-accent transition-colors">方案对比</a>
+                <a href="#implement" class="hover:text-accent transition-colors">落地代码</a>
+                <a href="#deploy" class="hover:text-accent transition-colors">部署指南</a>
+            </nav>
+            <button id="menuBtn" class="md:hidden text-white focus:outline-none">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+        </div>
+        <!-- 移动端菜单 -->
+        <div id="mobileMenu" class="hidden md:hidden bg-secondary px-4 py-2 space-y-2">
+            <a href="#overview" class="block py-2 hover:text-accent transition-colors">架构总览</a>
+            <a href="#core" class="block py-2 hover:text-accent transition-colors">分层详解</a>
+            <a href="#workflow" class="block py-2 hover:text-accent transition-colors">工作流程</a>
+            <a href="#compare" class="block py-2 hover:text-accent transition-colors">方案对比</a>
+            <a href="#implement" class="block py-2 hover:text-accent transition-colors">落地代码</a>
+            <a href="#deploy" class="block py-2 hover:text-accent transition-colors">部署指南</a>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 pt-24 pb-16 max-w-6xl">
+        <!-- 英雄区 -->
+        <section class="mb-16 text-center">
+            <h2 class="text-3xl md:text-4xl font-bold text-dark mb-4">主从分层Agent自动化调度系统</h2>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto mb-8">无状态子执行单元 + 文件级全局持久化 + 独立外部监控告警 全闭环实现方案</p>
+            <div class="bg-white rounded-xl shadow-md p-6 border border-gray-200 text-left">
+                <h3 class="font-bold text-lg mb-2 text-primary">方案核心定位</h3>
+                <p class="text-gray-700 mb-2">本方案针对传统Ralph Shell循环脚本的核心痛点，设计了一套「主Agent调度+无状态SubAgent执行+文件系统持久化+OpenClaw独立监控」的四层架构，实现了可追溯、抗崩溃、可远程值守、高扩展的自动化工作流引擎。</p>
+                <p class="text-gray-700">解决了传统循环脚本上下文耦合、故障卡死、状态不可视、无人值守不可控的核心问题，可直接落地于浏览器自动化、多账号运营、数据采集、批量任务处理等场景。</p>
+            </div>
+        </section>
+
+        <!-- 架构总览 -->
+        <section id="overview" class="mb-16 anchor-offset">
+            <h3 class="text-2xl font-bold text-dark mb-6 border-l-4 border-primary pl-4">一、核心架构总览</h3>
+            <!-- SVG架构图 -->
+            <div class="bg-white rounded-xl shadow-md p-4 md:p-8 border border-gray-200 mb-8 overflow-auto">
+                <svg width="100%" height="480" viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg">
+                    <!-- 背景网格 -->
+                    <defs>
+                        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#f1f5f9" stroke-width="1"/>
+                        </pattern>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#165DFF"/>
+                        </marker>
+                        <marker id="arrowhead-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#dc2626"/>
+                        </marker>
+                    </defs>
+                    <rect width="1000" height="480" fill="url(#grid)" />
+                    
+                    <!-- 持久化层 -->
+                    <rect x="300" y="320" width="400" height="100" rx="8" fill="#EFF6FF" stroke="#165DFF" stroke-width="2"/>
+                    <text x="500" y="345" text-anchor="middle" font-weight="bold" font-size="16" fill="#165DFF">文件持久化层</text>
+                    <text x="500" y="370" text-anchor="middle" font-size="14" fill="#475569">progress.md | memory.md | harness 规则文件 | 运行日志</text>
+                    <text x="500" y="395" text-anchor="middle" font-size="13" fill="#64748B">全局唯一真相源 | 全量Agent可读可写 | 持久化进度与规则</text>
+
+                    <!-- 主Agent -->
+                    <rect x="400" y="180" width="200" height="100" rx="8" fill="#DBEAFE" stroke="#1E40AF" stroke-width="2"/>
+                    <text x="500" y="205" text-anchor="middle" font-weight="bold" font-size="16" fill="#1E40AF">主Agent (调度层)</text>
+                    <text x="500" y="230" text-anchor="middle" font-size="14" fill="#475569">任务拆解</text>
+                    <text x="500" y="250" text-anchor="middle" font-size="14" fill="#475569">子Agent分发</text>
+                    <text x="500" y="270" text-anchor="middle" font-size="14" fill="#475569">进度校验与更新</text>
+
+                    <!-- SubAgent集群 -->
+                    <rect x="100" y="60" width="180" height="80" rx="8" fill="#F0FDFA" stroke="#0D9488" stroke-width="2"/>
+                    <text x="190" y="85" text-anchor="middle" font-weight="bold" font-size="16" fill="#0D9488">SubAgent 1</text>
+                    <text x="190" y="110" text-anchor="middle" font-size="14" fill="#475569">无状态 | 原子任务执行</text>
+                    <text x="190" y="130" text-anchor="middle" font-size="13" fill="#64748B">执行完即销毁</text>
+
+                    <rect x="320" y="60" width="180" height="80" rx="8" fill="#F0FDFA" stroke="#0D9488" stroke-width="2"/>
+                    <text x="410" y="85" text-anchor="middle" font-weight="bold" font-size="16" fill="#0D9488">SubAgent 2</text>
+                    <text x="410" y="110" text-anchor="middle" font-size="14" fill="#475569">无状态 | 原子任务执行</text>
+                    <text x="410" y="130" text-anchor="middle" font-size="13" fill="#64748B">执行完即销毁</text>
+
+                    <rect x="540" y="60" width="180" height="80" rx="8" fill="#F0FDFA" stroke="#0D9488" stroke-width="2"/>
+                    <text x="630" y="85" text-anchor="middle" font-weight="bold" font-size="16" fill="#0D9488">SubAgent 3</text>
+                    <text x="630" y="110" text-anchor="middle" font-size="14" fill="#475569">无状态 | 原子任务执行</text>
+                    <text x="630" y="130" text-anchor="middle" font-size="13" fill="#64748B">执行完即销毁</text>
+
+                    <rect x="760" y="60" width="140" height="80" rx="8" fill="#F0FDFA" stroke="#0D9488" stroke-width="2" stroke-dasharray="5,5"/>
+                    <text x="830" y="85" text-anchor="middle" font-weight="bold" font-size="16" fill="#0D9488">SubAgent N</text>
+                    <text x="830" y="110" text-anchor="middle" font-size="14" fill="#475569">无限扩展</text>
+
+                    <!-- OpenClaw监控层 -->
+                    <rect x="780" y="180" width="160" height="100" rx="8" fill="#FEF2F2" stroke="#DC2626" stroke-width="2"/>
+                    <text x="860" y="205" text-anchor="middle" font-weight="bold" font-size="16" fill="#DC2626">OpenClaw 监控层</text>
+                    <text x="860" y="230" text-anchor="middle" font-size="14" fill="#475569">独立进程</text>
+                    <text x="860" y="250" text-anchor="middle" font-size="14" fill="#475569">状态监测</text>
+                    <text x="860" y="270" text-anchor="middle" font-size="14" fill="#475569">异常告警</text>
+
+                    <!-- 手机告警 -->
+                    <rect x="820" y="320" width="80" height="100" rx="12" fill="#1F2937" stroke="#111827" stroke-width="2"/>
+                    <rect x="830" y="330" width="60" height="80" rx="4" fill="#0F172A"/>
+                    <text x="860" y="375" text-anchor="middle" font-size="12" fill="white" font-weight="bold">告警推送</text>
+                    <text x="860" y="395" text-anchor="middle" font-size="10" fill="#36CFC9">手机实时接收</text>
+
+                    <!-- 连接线 -->
+                    <!-- 主Agent到SubAgent -->
+                    <line x1="450" y1="180" x2="190" y2="140" stroke="#1E40AF" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <line x1="500" y1="180" x2="410" y2="140" stroke="#1E40AF" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <line x1="550" y1="180" x2="630" y2="140" stroke="#1E40AF" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <line x1="580" y1="200" x2="780" y2="100" stroke="#1E40AF" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowhead)"/>
+                    
+                    <!-- 主Agent与持久化层 -->
+                    <line x1="500" y1="280" x2="500" y2="320" stroke="#165DFF" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <line x1="500" y1="320" x2="500" y2="280" stroke="#165DFF" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    
+                    <!-- SubAgent与持久化层 -->
+                    <line x1="190" y1="140" x2="350" y2="320" stroke="#0D9488" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrowhead)"/>
+                    <line x1="410" y1="140" x2="420" y2="320" stroke="#0D9488" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrowhead)"/>
+                    <line x1="630" y1="140" x2="580" y2="320" stroke="#0D9488" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrowhead)"/>
+                    
+                    <!-- OpenClaw监控连接 -->
+                    <line x1="780" y1="230" x2="600" y2="230" stroke="#DC2626" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead-red)"/>
+                    <line x1="860" y1="280" x2="860" y2="320" stroke="#DC2626" stroke-width="2" marker-end="url(#arrowhead-red)"/>
+                    <line x1="780" y1="250" x2="650" y2="320" stroke="#DC2626" stroke-width="2" stroke-dasharray="4,2" marker-end="url(#arrowhead-red)"/>
+                </svg>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="font-bold text-lg mb-3 text-primary">核心设计理念</h4>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <span class="text-primary mr-2">●</span>
+                            <span><strong>调度与执行解耦</strong>：主Agent只负责调度与决策，SubAgent只负责原子任务执行，互不耦合</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-primary mr-2">●</span>
+                            <span><strong>无状态执行</strong>：SubAgent无内存上下文，执行即销毁，彻底解决上下文污染、崩溃无法重试问题</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-primary mr-2">●</span>
+                            <span><strong>文件级全局状态</strong>：以Markdown文件作为全局唯一真相源，全链路可追溯、可回滚、可人工干预</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-primary mr-2">●</span>
+                            <span><strong>独立监控兜底</strong>：OpenClaw监控与主进程完全解耦，实现真正的无人值守与远程状态感知</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="font-bold text-lg mb-3 text-primary">适用场景</h4>
+                    <ul class="space-y-2 text-gray-700">
+                        <li class="flex items-start">
+                            <span class="text-accent mr-2">●</span>
+                            <span>浏览器自动化与RPA流程（多账号运营、批量表单处理、数据采集）</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-accent mr-2">●</span>
+                            <span>跨境电商平台自动化上架、订单处理、库存同步</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-accent mr-2">●</span>
+                            <span>批量数据处理、文档转换、内容生成与分发</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-accent mr-2">●</span>
+                            <span>需要7*24小时无人值守、可远程监控的自动化任务</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-accent mr-2">●</span>
+                            <span>需要高容错、可重试、可追溯的生产级自动化流程</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <!-- 分层详解 -->
+        <section id="core" class="mb-16 anchor-offset">
+            <h3 class="text-2xl font-bold text-dark mb-6 border-l-4 border-primary pl-4">二、架构分层详细设计</h3>
+            
+            <!-- 主Agent层 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4 flex items-center">
+                        <span class="w-8 h-8 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm">1</span>
+                        主Agent调度层（核心大脑）
+                    </h4>
+                    <div class="space-y-4">
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">核心职责</h5>
+                            <p class="text-gray-700 mb-2">整个系统的决策与调度核心，负责全局任务管理、子Agent生命周期管控、进度校验与规则执行，是唯一的任务入口与进度管理者。</p>
+                            <ul class="space-y-1 pl-6 list-disc text-gray-700">
+                                <li>加载全局规则与持久化进度，初始化任务上下文</li>
+                                <li>将大任务拆解为原子化、可独立执行的子任务</li>
+                                <li>按调度规则分发子任务，启动对应SubAgent执行单元</li>
+                                <li>校验SubAgent执行结果，更新全局进度文件</li>
+                                <li>异常兜底处理：失败重试、超时终止、任务降级</li>
+                                <li>任务完成判定与全流程收尾工作</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">Harness规则设计（核心约束）</h5>
+                            <p class="text-gray-700 mb-2">主Agent的行为完全由Harness规则文件约束，实现逻辑与配置解耦，无需修改代码即可调整调度策略。</p>
+                            <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                <h6 class="font-bold mb-2">核心配置项</h6>
+                                <ul class="space-y-1 pl-6 list-disc text-gray-700">
+                                    <li><strong>角色定义</strong>：主Agent的身份、核心目标、禁止行为</li>
+                                    <li><strong>工作流规则</strong>：任务拆解标准、执行顺序、优先级策略</li>
+                                    <li><strong>重试策略</strong>：单任务最大重试次数、重试间隔、失败降级规则</li>
+                                    <li><strong>超时规则</strong>：SubAgent执行超时时间、主循环心跳间隔</li>
+                                    <li><strong>校验规则</strong>：子任务完成的判定标准、结果校验逻辑</li>
+                                    <li><strong>异常处理规则</strong>：连续失败的处理逻辑、停滞告警阈值</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">设计核心亮点</h5>
+                            <p class="text-gray-700">主Agent不执行任何具体业务逻辑，只做调度与决策，彻底和执行层解耦；所有状态全部持久化到文件，即使崩溃重启，也可从断点继续执行，不会出现任务中断或重复执行。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SubAgent层 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4 flex items-center">
+                        <span class="w-8 h-8 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm">2</span>
+                        SubAgent执行层（无状态工作单元）
+                    </h4>
+                    <div class="space-y-4">
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">核心设计原则</h5>
+                            <p class="text-gray-700 mb-2"><strong>完全无状态、原子化执行、用完即毁</strong>。每个SubAgent只负责执行单一原子任务，启动时只读全局文件，执行完成后只写入结果日志，不保留任何内存上下文，执行完毕即销毁。</p>
+                        </div>
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">核心职责</h5>
+                            <ul class="space-y-1 pl-6 list-disc text-gray-700">
+                                <li>启动时读取全局memory.md、progress.md、sub-rules.md，获取执行所需的全部参数与规则</li>
+                                <li>严格按照规则执行单一原子任务（浏览器操作、接口请求、数据处理、文件操作等）</li>
+                                <li>输出标准化执行日志与结果，写入全局日志文件</li>
+                                <li>执行完成后，标记任务状态，触发主Agent进度更新</li>
+                                <li>执行异常时，输出标准化错误信息，不污染全局状态</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">设计核心优势</h5>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-1 text-dark">极致抗崩溃</h6>
+                                    <p class="text-sm text-gray-700">单任务执行失败/崩溃，只会销毁当前SubAgent，不会影响主进程和其他任务，可直接重试</p>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-1 text-dark">零上下文污染</h6>
+                                    <p class="text-sm text-gray-700">无内存上下文，每个任务都是全新环境，彻底解决传统循环中上下文串扰、变量污染问题</p>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-1 text-dark">无限可扩展</h6>
+                                    <p class="text-sm text-gray-700">可并行启动多个SubAgent，支持分布式部署，新增任务只需新增对应SubAgent，无需修改主架构</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                            <h6 class="font-bold text-yellow-800 mb-1">关键约束</h6>
+                            <p class="text-sm text-yellow-700">SubAgent禁止修改全局progress.md的核心进度，仅可写入执行日志与结果标记，进度更新权限完全收归主Agent，避免多进程并发写入冲突。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 文件持久化层 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4 flex items-center">
+                        <span class="w-8 h-8 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm">3</span>
+                        文件持久化层（全局唯一真相源）
+                    </h4>
+                    <div class="space-y-4">
+                        <p class="text-gray-700">本层是整个系统的状态中枢，所有Agent的行为、进度、规则全部以纯文本Markdown文件存储，不依赖任何数据库，轻量、可追溯、可人工编辑、全链路透明。</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h5 class="font-bold text-lg mb-2 text-primary">核心文件设计</h5>
+                                <div class="space-y-3">
+                                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                        <h6 class="font-bold mb-1">progress.md 进度文件</h6>
+                                        <p class="text-sm text-gray-700 mb-1">全局任务进度的唯一凭证，采用YAML Frontmatter + Markdown正文结构，支持机器读取与人工编辑。</p>
+                                        <p class="text-xs text-gray-600">核心字段：当前阶段、已完成步骤、待执行步骤、失败任务记录、重试次数、最近执行时间、任务状态标记</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                        <h6 class="font-bold mb-1">memory.md 全局记忆文件</h6>
+                                        <p class="text-sm text-gray-700 mb-1">存储全局上下文、固定参数、环境变量、账号信息、全局约束规则，所有Agent共享只读。</p>
+                                        <p class="text-xs text-gray-600">核心内容：任务基础信息、环境配置、账号凭证、全局阈值、禁止行为清单</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h5 class="font-bold text-lg mb-2 text-primary">规则与日志文件</h5>
+                                <div class="space-y-3">
+                                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                        <h6 class="font-bold mb-1">harness/ 规则目录</h6>
+                                        <p class="text-sm text-gray-700 mb-1">存储主Agent与SubAgent的所有行为规则，实现配置与代码完全解耦。</p>
+                                        <p class="text-xs text-gray-600">核心文件：main-rules.md（主Agent调度规则）、sub-rules.md（SubAgent执行规范）、validate-rules.md（结果校验规则）</p>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                        <h6 class="font-bold mb-1">logs/ 运行日志目录</h6>
+                                        <p class="text-sm text-gray-700 mb-1">动态更新的全链路运行日志，按日期/任务拆分，包含主Agent调度日志、SubAgent执行日志、错误日志。</p>
+                                        <p class="text-xs text-gray-600">核心作用：问题排查、执行追溯、监控数据来源、合规审计</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">文件读写规则（核心约束）</h5>
+                            <ul class="space-y-1 pl-6 list-disc text-gray-700">
+                                <li><strong>唯一写入权限</strong>：progress.md的核心进度仅允许主Agent修改，SubAgent仅可追加日志与结果标记</li>
+                                <li><strong>原子写入</strong>：所有文件修改采用「临时文件写入+替换原文件」的原子操作，避免文件损坏</li>
+                                <li><strong>文件锁机制</strong>：主Agent写入时加排他锁，避免并发写入冲突</li>
+                                <li><strong>版本备份</strong>：每次进度更新自动备份上一版本，支持一键回滚到任意历史节点</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OpenClaw监控层 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4 flex items-center">
+                        <span class="w-8 h-8 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm">4</span>
+                        OpenClaw外部监控层（无人值守兜底）
+                    </h4>
+                    <div class="space-y-4">
+                        <p class="text-gray-700">本层是整套系统实现真正无人值守的核心，与主Agent进程完全解耦，独立运行，负责全链路状态监测、异常检测与手机端实时告警，解决了「人离开电脑，无法感知Agent是否正常运行」的核心痛点。</p>
+                        
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">核心设计原则</h5>
+                            <p class="text-gray-700 mb-2"><strong>独立进程、非侵入式、全链路监测、多渠道告警</strong>。不依赖主Agent的任何接口，仅通过文件系统与进程状态进行监测，即使主Agent完全崩溃，监控进程仍可正常运行并触发告警。</p>
+                        </div>
+
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">核心监测指标</h5>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-2">进程存活监测</h6>
+                                    <ul class="space-y-1 pl-4 list-disc text-sm text-gray-700">
+                                        <li>主Agent进程是否正常运行</li>
+                                        <li>进程CPU/内存占用是否异常</li>
+                                        <li>是否出现进程僵死、崩溃退出</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-2">进度更新监测</h6>
+                                    <ul class="space-y-1 pl-4 list-disc text-sm text-gray-700">
+                                        <li>progress.md是否在规定时间内有更新</li>
+                                        <li>是否出现任务停滞、进度卡死</li>
+                                        <li>任务完成度与预期是否匹配</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-2">异常日志监测</h6>
+                                    <ul class="space-y-1 pl-4 list-disc text-sm text-gray-700">
+                                        <li>错误日志关键词匹配（error、timeout、blocked）</li>
+                                        <li>SubAgent连续失败次数阈值告警</li>
+                                        <li>规则违反行为监测</li>
+                                    </ul>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-2">系统环境监测</h6>
+                                    <ul class="space-y-1 pl-4 list-disc text-sm text-gray-700">
+                                        <li>磁盘空间是否充足</li>
+                                        <li>网络连通性是否正常</li>
+                                        <li>浏览器/驱动环境是否正常</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h5 class="font-bold text-lg mb-2 text-primary">告警与联动能力</h5>
+                            <div class="space-y-3">
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-1">多渠道手机告警（核心能力）</h6>
+                                    <p class="text-sm text-gray-700">支持国内主流推送渠道，实现手机端实时告警，人离开电脑也能随时掌握Agent运行状态。</p>
+                                    <p class="text-xs text-gray-600 mt-1">支持渠道：微信推送（Server酱）、钉钉机器人、企业微信机器人、飞书机器人、短信告警、邮件告警</p>
+                                </div>
+                                <div class="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                    <h6 class="font-bold mb-1">自动联动处置</h6>
+                                    <p class="text-sm text-gray-700">除了告警，还可配置自动处置规则，实现故障自愈。</p>
+                                    <ul class="text-xs text-gray-600 mt-1 pl-4 list-disc">
+                                        <li>主进程崩溃时，自动重启主Agent</li>
+                                        <li>环境异常时，自动清理环境、重置浏览器</li>
+                                        <li>连续失败时，自动回滚进度、暂停任务</li>
+                                        <li>严重异常时，自动终止所有进程，避免风险扩大</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 工作流程 -->
+        <section id="workflow" class="mb-16 anchor-offset">
+            <h3 class="text-2xl font-bold text-dark mb-6 border-l-4 border-primary pl-4">三、完整工作流闭环</h3>
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200 mb-6">
+                <ol class="space-y-4">
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">1</span>
+                        <div>
+                            <h5 class="font-bold text-dark">系统初始化</h5>
+                            <p class="text-gray-700">用户配置全局memory.md与harness规则文件，初始化progress.md空白进度文件，定义任务目标与执行规则。</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">2</span>
+                        <div>
+                            <h5 class="font-bold text-dark">主Agent启动</h5>
+                            <p class="text-gray-700">主Agent加载规则文件与进度文件，初始化任务上下文，校验环境与配置，进入主调度循环。</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">3</span>
+                        <div>
+                            <h5 class="font-bold text-dark">任务拆解与分发</h5>
+                            <p class="text-gray-700">主Agent根据当前进度，拆解出下一个原子子任务，生成执行指令与参数，启动对应的SubAgent执行单元。</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">4</span>
+                        <div>
+                            <h5 class="font-bold text-dark">SubAgent无状态执行</h5>
+                            <p class="text-gray-700">SubAgent启动后，读取全局文件获取执行参数与规则，执行原子任务，输出标准化执行日志与结果，执行完成后自动销毁。</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">5</span>
+                        <div>
+                            <h5 class="font-bold text-dark">结果校验与进度更新</h5>
+                            <p class="text-gray-700">主Agent等待SubAgent执行完成，根据校验规则验证执行结果，验证通过则更新progress.md进度，验证失败则按规则触发重试或降级。</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">6</span>
+                        <div>
+                            <h5 class="font-bold text-dark">循环执行</h5>
+                            <p class="text-gray-700">主Agent重复步骤3-5，直到所有任务完成，或触发终止规则。</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">7</span>
+                        <div>
+                            <h5 class="font-bold text-dark">OpenClaw全流程独立监控</h5>
+                            <p class="text-gray-700">从系统启动开始，OpenClaw独立进程持续监测进程状态、进度更新、异常日志，出现异常时立即推送告警到用户手机，或触发自动处置规则。</p>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">8</span>
+                        <div>
+                            <h5 class="font-bold text-dark">任务收尾</h5>
+                            <p class="text-gray-700">所有任务完成后，主Agent生成任务总结报告，备份全量日志与进度文件，推送任务完成通知到用户手机，正常退出。</p>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- 方案对比 -->
+        <section id="compare" class="mb-16 anchor-offset">
+            <h3 class="text-2xl font-bold text-dark mb-6 border-l-4 border-primary pl-4">四、与传统Ralph Shell循环方案对比</h3>
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-100 border-b border-gray-200">
+                                <th class="px-6 py-3 font-bold text-dark">对比维度</th>
+                                <th class="px-6 py-3 font-bold text-dark">传统Ralph Shell循环方案</th>
+                                <th class="px-6 py-3 font-bold text-primary">本方案</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">架构设计</td>
+                                <td class="px-6 py-4 text-gray-700">单层死循环，调度与执行耦合</td>
+                                <td class="px-6 py-4 text-primary font-medium">主从分层架构，调度与执行完全解耦</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">状态管理</td>
+                                <td class="px-6 py-4 text-gray-700">内存上下文，进程崩溃即丢失，易污染</td>
+                                <td class="px-6 py-4 text-primary font-medium">文件级持久化，全局唯一真相源，断点续跑</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">抗崩溃能力</td>
+                                <td class="px-6 py-4 text-gray-700">单步异常即卡死整个循环，无兜底</td>
+                                <td class="px-6 py-4 text-primary font-medium">SubAgent异常不影响主进程，自动重试，故障自愈</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">可追溯性</td>
+                                <td class="px-6 py-4 text-gray-700">仅基础日志，无结构化进度，无法回溯</td>
+                                <td class="px-6 py-4 text-primary font-medium">全链路结构化进度+日志，每一步可追溯、可回滚</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">无人值守能力</td>
+                                <td class="px-6 py-4 text-gray-700">无独立监控，卡死无法感知，无法远程值守</td>
+                                <td class="px-6 py-4 text-primary font-medium">独立OpenClaw监控，手机实时告警，真正无人值守</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">可扩展性</td>
+                                <td class="px-6 py-4 text-gray-700">新增任务需修改主循环，耦合度高，无法并行</td>
+                                <td class="px-6 py-4 text-primary font-medium">新增任务只需新增SubAgent，支持并行与分布式扩展</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 font-medium">可维护性</td>
+                                <td class="px-6 py-4 text-gray-700">逻辑与配置耦合，修改规则需改代码</td>
+                                <td class="px-6 py-4 text-primary font-medium">规则与代码完全解耦，配置化管理，无需改代码即可调整策略</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 落地代码实现 -->
+        <section id="implement" class="mb-16 anchor-offset">
+            <h3 class="text-2xl font-bold text-dark mb-6 border-l-4 border-primary pl-4">五、落地实现代码（可直接运行POC）</h3>
+            
+            <!-- 目录结构 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">项目目录结构</h4>
+                    <div class="code-block">
+                        <pre><code class="language-bash">agent-automation-system/
+├── main_agent.py                 # 主Agent核心调度程序
+├── sub_agents/                   # SubAgent执行单元目录
+│   ├── base_subagent.py          # SubAgent基类
+│   ├── browser_task_agent.py     # 浏览器自动化执行单元
+│   ├── data_process_agent.py     # 数据处理执行单元
+│   └── api_request_agent.py      # 接口请求执行单元
+├── harness/                       # 规则配置目录
+│   ├── main-rules.md             # 主Agent调度规则
+│   ├── sub-rules.md              # SubAgent执行规范
+│   └── validate-rules.md         # 结果校验规则
+├── data/                          # 持久化数据目录
+│   ├── progress.md               # 全局进度文件
+│   ├── memory.md                 # 全局记忆文件
+│   └── backup/                   # 进度备份目录
+├── logs/                          # 运行日志目录
+│   ├── main_agent.log            # 主Agent调度日志
+│   ├── sub_agent_exec.log        # SubAgent执行日志
+│   └── error.log                 # 错误日志
+├── openclaw/                      # OpenClaw监控系统
+│   ├── monitor.py                # 核心监控程序
+│   ├── alert.py                  # 告警推送模块
+│   └── config.yaml               # 监控配置文件
+└── requirements.txt               # 项目依赖</code></pre>
+                        <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-0">复制代码</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 持久化文件模板 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">1. 持久化文件模板</h4>
+                    
+                    <div class="mb-6">
+                        <h5 class="font-bold text-lg mb-2 text-primary">progress.md 进度文件模板</h5>
+                        <div class="code-block">
+                            <pre><code class="language-markdown">---
+# 任务基础信息
+task_name: 多账号自动化运营任务
+task_id: TASK20240501001
+total_steps: 10
+current_step: 0
+completed_steps: []
+failed_steps: []
+max_retry_times: 3
+# 进度状态
+current_status: pending # pending/running/completed/failed
+last_update_time: 2024-05-01 00:00:00
+last_exec_result: null
+# 执行统计
+total_exec_time: 0s
+success_count: 0
+failed_count: 0
+---
+
+# 任务进度详情
+
+## 任务总览
+本任务用于自动化完成多账号的日常运营操作，包括账号登录、数据采集、内容发布、状态检查等。
+
+## 执行步骤清单
+1. [ ] 初始化环境，检查浏览器驱动与网络连通性
+2. [ ] 账号1：登录平台，完成日常签到任务
+3. [ ] 账号1：采集账号运营数据，保存到本地
+4. [ ] 账号1：发布预设内容，校验发布结果
+5. [ ] 账号2：登录平台，完成日常签到任务
+6. [ ] 账号2：采集账号运营数据，保存到本地
+7. [ ] 账号2：发布预设内容，校验发布结果
+8. [ ] 汇总所有账号数据，生成运营报告
+9. [ ] 备份所有执行日志与数据文件
+10. [ ] 推送任务完成通知，正常退出
+
+## 执行记录
+暂无执行记录</code></pre>
+                            <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-1">复制代码</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h5 class="font-bold text-lg mb-2 text-primary">memory.md 全局记忆文件模板</h5>
+                        <div class="code-block">
+                            <pre><code class="language-markdown">---
+# 环境配置
+env: production
+browser_type: chrome
+headless: true
+timeout: 30000
+retry_interval: 5s
+# 平台配置
+target_platform: 示例运营平台
+platform_url: https://example.com
+# 账号列表
+accounts:
+  - account_id: 1
+    username: user1@example.com
+    password: ******
+    task_config:
+      enable_sign: true
+      enable_data_collect: true
+      enable_publish: true
+      publish_content: ./content/account1_post.md
+  - account_id: 2
+    username: user2@example.com
+    password: ******
+    task_config:
+      enable_sign: true
+      enable_data_collect: true
+      enable_publish: true
+      publish_content: ./content/account2_post.md
+# 全局约束
+global_constraints:
+  - 禁止在非工作时间执行操作
+  - 单账号操作间隔不低于10秒
+  - 禁止频繁刷新页面，单页面刷新不超过3次
+  - 出现验证码时立即终止任务，等待人工处理
+  - 禁止修改账号核心信息与安全设置
+---
+
+# 全局规则说明
+本文件存储任务执行所需的全部固定参数与全局配置，所有Agent仅可读取，不可修改。
+如需调整配置，请在任务暂停状态下人工修改本文件。</code></pre>
+                            <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-2">复制代码</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主Agent核心代码 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">2. 主Agent核心代码（main_agent.py）</h4>
+                    <div class="code-block">
+                        <pre><code class="language-python">import os
+import time
+import yaml
+import logging
+from datetime import datetime
+from pathlib import Path
+from sub_agents.base_subagent import SubAgentFactory
+
+# 路径配置
+BASE_DIR = Path(__file__).parent
+DATA_DIR = BASE_DIR / "data"
+HARNESS_DIR = BASE_DIR / "harness"
+LOG_DIR = BASE_DIR / "logs"
+BACKUP_DIR = DATA_DIR / "backup"
+
+# 初始化日志
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_DIR / "main_agent.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("MainAgent")
+
+class MainAgent:
+    def __init__(self):
+        self.task_name = ""
+        self.task_config = {}
+        self.progress = {}
+        self.main_rules = {}
+        self.current_step = 0
+        self.is_running = False
+        self._init_dirs()
+        self._load_config()
+
+    def _init_dirs(self):
+        """初始化目录"""
+        for dir_path in [DATA_DIR, HARNESS_DIR, LOG_DIR, BACKUP_DIR]:
+            dir_path.mkdir(parents=True, exist_ok=True)
+
+    def _load_config(self):
+        """加载配置与进度文件"""
+        # 加载进度文件
+        progress_file = DATA_DIR / "progress.md"
+        if not progress_file.exists():
+            raise FileNotFoundError("进度文件 progress.md 不存在，请先初始化")
+        
+        # 解析YAML Frontmatter
+        with open(progress_file, "r", encoding="utf-8") as f:
+            content = f.read()
+            if content.startswith("---"):
+                _, frontmatter, body = content.split("---", 2)
+                self.progress = yaml.safe_load(frontmatter)
+                self.progress_body = body
+            else:
+                raise ValueError("进度文件格式错误，缺少YAML Frontmatter")
+        
+        # 加载主规则文件
+        with open(HARNESS_DIR / "main-rules.md", "r", encoding="utf-8") as f:
+            self.main_rules_content = f.read()
+        
+        # 加载全局记忆文件
+        with open(DATA_DIR / "memory.md", "r", encoding="utf-8") as f:
+            self.memory_content = f.read()
+        
+        # 初始化任务参数
+        self.task_name = self.progress.get("task_name", "未知任务")
+        self.current_step = self.progress.get("current_step", 0)
+        self.total_steps = self.progress.get("total_steps", 0)
+        logger.info(f"【主Agent】初始化完成，任务：{self.task_name}，总步骤：{self.total_steps}，当前步骤：{self.current_step}")
+
+    def _backup_progress(self):
+        """备份进度文件"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = BACKUP_DIR / f"progress_backup_{timestamp}.md"
+        with open(DATA_DIR / "progress.md", "r", encoding="utf-8") as src:
+            with open(backup_file, "w", encoding="utf-8") as dst:
+                dst.write(src.read())
+        logger.info(f"【主Agent】进度文件已备份：{backup_file.name}")
+
+    def _update_progress(self, step, status, result=None, failed=False):
+        """更新进度文件"""
+        self._backup_progress()
+        
+        # 更新进度数据
+        self.progress["current_step"] = step
+        self.progress["last_update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.progress["last_exec_result"] = result
+        self.progress["current_status"] = status
+        
+        if status == "completed" and not failed:
+            self.progress["completed_steps"].append(step)
+            self.progress["success_count"] = self.progress.get("success_count", 0) + 1
+        elif failed:
+            self.progress["failed_steps"].append({"step": step, "result": result})
+            self.progress["failed_count"] = self.progress.get("failed_count", 0) + 1
+        
+        # 原子写入进度文件
+        new_content = f"---\n{yaml.dump(self.progress, allow_unicode=True)}---\n{self.progress_body}"
+        temp_file = DATA_DIR / "progress.tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
+            f.write(new_content)
+        temp_file.replace(DATA_DIR / "progress.md")
+        
+        self.current_step = step
+        logger.info(f"【主Agent】进度已更新，当前步骤：{step}，状态：{status}")
+
+    def _validate_result(self, step, result):
+        """校验执行结果"""
+        # 加载校验规则
+        with open(HARNESS_DIR / "validate-rules.md", "r", encoding="utf-8") as f:
+            validate_rules = f.read()
+        
+        # 简单校验逻辑，可根据规则扩展
+        if result.get("success", False):
+            logger.info(f"【主Agent】步骤{step}执行结果校验通过")
+            return True
+        else:
+            logger.error(f"【主Agent】步骤{step}执行结果校验失败：{result.get('error', '未知错误')}")
+            return False
+
+    def _execute_step(self, step):
+        """执行单一步骤"""
+        logger.info(f"【主Agent】开始执行步骤{step}")
+        max_retry = self.progress.get("max_retry_times", 3)
+        retry_interval = self.main_rules.get("retry_interval", 5)
+        
+        for retry in range(max_retry):
+            try:
+                # 获取SubAgent实例
+                sub_agent = SubAgentFactory.get_agent(step, self.memory_content, self.main_rules_content)
+                # 执行任务
+                result = sub_agent.execute()
+                # 校验结果
+                if self._validate_result(step, result):
+                    return result, False
+                else:
+                    logger.warning(f"【主Agent】步骤{step}执行失败，重试次数：{retry+1}/{max_retry}")
+                    time.sleep(retry_interval)
+            except Exception as e:
+                logger.error(f"【主Agent】步骤{step}执行异常：{str(e)}，重试次数：{retry+1}/{max_retry}")
+                time.sleep(retry_interval)
+        
+        # 重试全部失败
+        return {"success": False, "error": f"重试{max_retry}次全部失败"}, True
+
+    def run(self):
+        """启动主Agent调度循环"""
+        logger.info(f"【主Agent】启动任务调度循环，任务：{self.task_name}")
+        self.is_running = True
+        self._update_progress(self.current_step, "running")
+        
+        try:
+            while self.is_running and self.current_step < self.total_steps:
+                next_step = self.current_step + 1
+                # 执行步骤
+                result, failed = self._execute_step(next_step)
+                # 更新进度
+                if not failed:
+                    self._update_progress(next_step, "running", result)
+                else:
+                    # 处理失败，根据规则决定是否继续
+                    stop_on_failure = self.main_rules.get("stop_on_failure", True)
+                    if stop_on_failure:
+                        self._update_progress(next_step, "failed", result, failed=True)
+                        logger.error(f"【主Agent】步骤{next_step}执行失败，任务终止")
+                        break
+                    else:
+                        self._update_progress(next_step, "skipped", result, failed=True)
+                        logger.warning(f"【主Agent】步骤{next_step}执行失败，跳过继续执行")
+                
+                # 执行间隔，避免过快
+                time.sleep(self.main_rules.get("step_interval", 2))
+            
+            # 任务完成
+            if self.current_step >= self.total_steps:
+                self._update_progress(self.current_step, "completed")
+                logger.info(f"【主Agent】任务全部执行完成！任务：{self.task_name}")
+        
+        except KeyboardInterrupt:
+            logger.warning("【主Agent】收到中断信号，任务暂停")
+            self._update_progress(self.current_step, "paused")
+        except Exception as e:
+            logger.error(f"【主Agent】调度循环异常：{str(e)}", exc_info=True)
+            self._update_progress(self.current_step, "failed", {"error": str(e)})
+        finally:
+            self.is_running = False
+
+if __name__ == "__main__":
+    agent = MainAgent()
+    agent.run()</code></pre>
+                        <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-3">复制代码</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SubAgent基类与示例 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">3. SubAgent执行单元代码</h4>
+                    
+                    <div class="mb-6">
+                        <h5 class="font-bold text-lg mb-2 text-primary">base_subagent.py 基类</h5>
+                        <div class="code-block">
+                            <pre><code class="language-python">import logging
+from abc import ABC, abstractmethod
+from pathlib import Path
+
+# 日志配置
+LOG_DIR = Path(__file__).parent.parent / "logs"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_DIR / "sub_agent_exec.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+
+class BaseSubAgent(ABC):
+    """SubAgent抽象基类，所有执行单元必须继承此类"""
+    def __init__(self, step, memory_content, rules_content):
+        self.step = step
+        self.memory_content = memory_content
+        self.rules_content = rules_content
+        self.logger = logging.getLogger(f"SubAgent-Step{step}")
+        self.exec_result = {"success": False, "step": step, "data": None, "error": None}
+
+    @abstractmethod
+    def _exec_logic(self):
+        """核心执行逻辑，子类必须实现此方法"""
+        pass
+
+    def execute(self):
+        """执行入口，统一封装异常处理与日志"""
+        self.logger.info(f"【SubAgent-{self.step}】开始执行任务")
+        try:
+            # 执行核心逻辑
+            result = self._exec_logic()
+            self.exec_result["success"] = True
+            self.exec_result["data"] = result
+            self.logger.info(f"【SubAgent-{self.step}】任务执行成功")
+        except Exception as e:
+            self.exec_result["error"] = str(e)
+            self.logger.error(f"【SubAgent-{self.step}】任务执行异常：{str(e)}", exc_info=True)
+        finally:
+            # 执行完成，返回结果，实例即将销毁
+            return self.exec_result
+
+class SubAgentFactory:
+    """SubAgent工厂类，根据步骤获取对应执行单元"""
+    @staticmethod
+    def get_agent(step, memory_content, rules_content):
+        """
+        根据步骤编号匹配对应的SubAgent
+        可根据实际业务场景扩展匹配规则
+        """
+        # 延迟导入，避免循环依赖
+        from .browser_task_agent import BrowserTaskAgent
+        from .data_process_agent import DataProcessAgent
+        from .api_request_agent import APIRequestAgent
+
+        # 步骤与Agent的映射关系，可根据实际业务调整
+        step_agent_map = {
+            1: BrowserTaskAgent,    # 环境初始化
+            2: BrowserTaskAgent,    # 账号1登录签到
+            3: DataProcessAgent,    # 账号1数据采集
+            4: BrowserTaskAgent,    # 账号1内容发布
+            5: BrowserTaskAgent,    # 账号2登录签到
+            6: DataProcessAgent,    # 账号2数据采集
+            7: BrowserTaskAgent,    # 账号2内容发布
+            8: DataProcessAgent,    # 数据汇总生成报告
+            9: DataProcessAgent,    # 日志备份
+            10: APIRequestAgent     # 通知推送
+        }
+
+        agent_class = step_agent_map.get(step)
+        if not agent_class:
+            raise ValueError(f"步骤{step}未匹配到对应的SubAgent执行单元")
+        
+        return agent_class(step, memory_content, rules_content)</code></pre>
+                            <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-4">复制代码</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h5 class="font-bold text-lg mb-2 text-primary">browser_task_agent.py 浏览器自动化示例</h5>
+                        <div class="code-block">
+                            <pre><code class="language-python">from .base_subagent import BaseSubAgent
+from playwright.sync_api import sync_playwright
+import yaml
+import time
+
+class BrowserTaskAgent(BaseSubAgent):
+    """浏览器自动化执行单元，用于页面操作、登录、签到、内容发布等"""
+    
+    def _parse_memory(self):
+        """解析全局记忆文件，获取配置"""
+        if self.memory_content.startswith("---"):
+            _, frontmatter, _ = self.memory_content.split("---", 2)
+            return yaml.safe_load(frontmatter)
+        return {}
+
+    def _exec_logic(self):
+        config = self._parse_memory()
+        step = self.step
+        
+        # 初始化浏览器
+        with sync_playwright() as p:
+            # 启动浏览器
+            browser = p.chromium.launch(
+                headless=config.get("headless", True),
+                timeout=config.get("timeout", 30000)
+            )
+            context = browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            )
+            page = context.new_page()
+            
+            try:
+                # 根据步骤执行对应操作
+                if step == 1:
+                    # 步骤1：环境初始化与连通性检查
+                    self.logger.info("检查平台连通性")
+                    page.goto(config.get("platform_url", "https://example.com"), wait_until="networkidle")
+                    return {"message": "环境初始化完成，平台连通性正常", "page_title": page.title()}
+                
+                elif step in [2, 5]:
+                    # 步骤2/5：账号登录与签到
+                    account_id = 1 if step == 2 else 2
+                    accounts = config.get("accounts", [])
+                    account = next((acc for acc in accounts if acc["account_id"] == account_id), None)
+                    if not account:
+                        raise ValueError(f"未找到账号{account_id}的配置信息")
+                    
+                    # 登录操作
+                    self.logger.info(f"开始登录账号{account_id}：{account['username']}")
+                    page.goto(f"{config.get('platform_url')}/login", wait_until="networkidle")
+                    page.fill('input[name="username"]', account["username"])
+                    page.fill('input[name="password"]', account["password"])
+                    page.click('button[type="submit"]')
+                    page.wait_for_url("**/dashboard", timeout=config.get("timeout", 30000))
+                    
+                    # 签到操作
+                    if account["task_config"].get("enable_sign", True):
+                        self.logger.info(f"执行账号{account_id}日常签到")
+                        page.click('button#sign-btn')
+                        page.wait_for_selector('.sign-success', timeout=10000)
+                        sign_result = page.locator('.sign-success').text_content()
+                        return {"message": f"账号{account_id}登录签到完成", "sign_result": sign_result}
+                
+                elif step in [4, 7]:
+                    # 步骤4/7：内容发布
+                    account_id = 1 if step == 4 else 2
+                    accounts = config.get("accounts", [])
+                    account = next((acc for acc in accounts if acc["account_id"] == account_id), None)
+                    
+                    # 读取发布内容
+                    content_path = account["task_config"].get("publish_content")
+                    with open(content_path, "r", encoding="utf-8") as f:
+                        publish_content = f.read()
+                    
+                    # 发布操作
+                    self.logger.info(f"账号{account_id}开始发布内容")
+                    page.goto(f"{config.get('platform_url')}/publish", wait_until="networkidle")
+                    page.fill('textarea#content', publish_content)
+                    page.click('button#publish-btn')
+                    page.wait_for_selector('.publish-success', timeout=15000)
+                    
+                    return {"message": f"账号{account_id}内容发布完成", "publish_status": "success"}
+                
+                else:
+                    raise ValueError(f"浏览器Agent不支持步骤{step}的执行")
+            
+            finally:
+                # 关闭浏览器，彻底清理环境
+                context.close()
+                browser.close()
+                self.logger.info("浏览器环境已清理")</code></pre>
+                            <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-5">复制代码</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OpenClaw监控代码 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">4. OpenClaw监控系统代码</h4>
+                    
+                    <div class="mb-6">
+                        <h5 class="font-bold text-lg mb-2 text-primary">monitor.py 核心监控程序</h5>
+                        <div class="code-block">
+                            <pre><code class="language-python">import os
+import time
+import yaml
+import psutil
+import logging
+from datetime import datetime, timedelta
+from pathlib import Path
+from alert import AlertSender
+
+# 路径配置
+BASE_DIR = Path(__file__).parent.parent
+DATA_DIR = BASE_DIR / "data"
+LOG_DIR = BASE_DIR / "logs"
+CONFIG_PATH = BASE_DIR / "openclaw" / "config.yaml"
+
+# 初始化日志
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - OpenClaw - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_DIR / "openclaw_monitor.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger("OpenClaw")
+
+class OpenClawMonitor:
+    def __init__(self):
+        self._load_config()
+        self.alert_sender = AlertSender(self.config.get("alert", {}))
+        self.last_progress_mtime = 0
+        self.last_alert_time = {}
+        self.main_pid = None
+        logger.info("【OpenClaw】监控系统初始化完成")
+
+    def _load_config(self):
+        """加载监控配置"""
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            self.config = yaml.safe_load(f)
+        
+        self.check_interval = self.config.get("check_interval", 10)
+        self.progress_timeout = self.config.get("progress_timeout", 300)
+        self.alert_cooldown = self.config.get("alert_cooldown", 60)
+        self.monitor_items = self.config.get("monitor_items", {})
+
+    def _check_process_alive(self):
+        """检查主Agent进程是否存活"""
+        if not self.monitor_items.get("process_alive", True):
+            return True, None
+        
+        # 查找主Agent进程
+        main_pid = None
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                cmdline = proc.cmdline()
+                if 'main_agent.py' in cmdline and 'python' in proc.name():
+                    main_pid = proc.pid
+                    break
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                continue
+        
+        self.main_pid = main_pid
+        if not main_pid:
+            return False, "主Agent进程未运行，可能已崩溃退出"
+        
+        # 检查进程状态
+        try:
+            proc = psutil.Process(main_pid)
+            if proc.status() in [psutil.STATUS_ZOMBIE, psutil.STATUS_DEAD]:
+                return False, "主Agent进程已僵死/死亡"
+            
+            # 检查CPU/内存占用是否异常
+            cpu_percent = proc.cpu_percent(interval=1)
+            memory_percent = proc.memory_percent()
+            if cpu_percent > self.config.get("cpu_threshold", 90):
+                return False, f"主Agent进程CPU占用异常：{cpu_percent}%"
+            if memory_percent > self.config.get("memory_threshold", 80):
+                return False, f"主Agent进程内存占用异常：{memory_percent}%"
+            
+            return True, f"主Agent进程正常运行，PID：{main_pid}，CPU：{cpu_percent}%，内存：{memory_percent}%"
+        
+        except Exception as e:
+            return False, f"检查主Agent进程异常：{str(e)}"
+
+    def _check_progress_update(self):
+        """检查进度是否正常更新"""
+        if not self.monitor_items.get("progress_update", True):
+            return True, None
+        
+        progress_file = DATA_DIR / "progress.md"
+        if not progress_file.exists():
+            return False, "进度文件不存在，任务可能未初始化"
+        
+        # 获取文件修改时间
+        mtime = progress_file.stat().st_mtime
+        now = time.time()
+        
+        # 首次运行记录时间
+        if self.last_progress_mtime == 0:
+            self.last_progress_mtime = mtime
+            return True, "首次监控，记录进度文件初始修改时间"
+        
+        # 检查是否超时未更新
+        if now - mtime > self.progress_timeout:
+            # 解析进度文件，检查是否已完成
+            with open(progress_file, "r", encoding="utf-8") as f:
+                content = f.read()
+                if content.startswith("---"):
+                    _, frontmatter, _ = content.split("---", 2)
+                    progress = yaml.safe_load(frontmatter)
+                    if progress.get("current_status") in ["completed", "failed"]:
+                        return True, f"任务已结束，状态：{progress.get('current_status')}"
+            
+            return False, f"进度文件已{int(now - mtime)}秒未更新，任务可能已卡死"
+        
+        # 检查进度是否正常推进
+        if mtime > self.last_progress_mtime:
+            self.last_progress_mtime = mtime
+            return True, "进度文件正常更新，任务运行中"
+        
+        return True, "进度文件未更新，但未超过超时阈值"
+
+    def _check_error_log(self):
+        """检查错误日志"""
+        if not self.monitor_items.get("error_log", True):
+            return True, None
+        
+        error_log_file = LOG_DIR / "error.log"
+        if not error_log_file.exists():
+            return True, "错误日志文件不存在，暂无错误"
+        
+        # 检查最近的错误日志
+        try:
+            with open(error_log_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                if not lines:
+                    return True, "错误日志为空，暂无错误"
+                
+                # 检查最近5分钟内的错误
+                now = datetime.now()
+                recent_errors = []
+                for line in lines[-20:]:  # 检查最近20行
+                    try:
+                        log_time_str = line.split(" - ")[0]
+                        log_time = datetime.strptime(log_time_str, "%Y-%m-%d %H:%M:%S,%f")
+                        if now - log_time < timedelta(minutes=5):
+                            recent_errors.append(line)
+                    except:
+                        continue
+                
+                if recent_errors:
+                    return False, f"最近5分钟内检测到{len(recent_errors)}条错误日志：{recent_errors[-1][:200]}"
+                
+                return True, "错误日志无新增异常"
+        
+        except Exception as e:
+            return False, f"检查错误日志异常：{str(e)}"
+
+    def _send_alert(self, alert_type, message):
+        """发送告警，带冷却时间"""
+        now = time.time()
+        last_time = self.last_alert_time.get(alert_type, 0)
+        if now - last_time < self.alert_cooldown:
+            logger.warning(f"【OpenClaw】告警冷却中，跳过本次告警：{alert_type}")
+            return
+        
+        logger.error(f"【OpenClaw】发送{alert_type}告警：{message}")
+        success = self.alert_sender.send_alert(f"【Agent自动化系统告警】{alert_type}", message)
+        
+        if success:
+            self.last_alert_time[alert_type] = now
+
+    def run_check(self):
+        """执行一次全量检查"""
+        logger.info("【OpenClaw】开始执行监控检查")
+        
+        # 1. 进程存活检查
+        process_ok, process_msg = self._check_process_alive()
+        if not process_ok:
+            self._send_alert("进程异常", process_msg)
+        else:
+            logger.info(f"【OpenClaw】进程检查通过：{process_msg}")
+        
+        # 2. 进度更新检查
+        progress_ok, progress_msg = self._check_progress_update()
+        if not progress_ok:
+            self._send_alert("进度停滞", progress_msg)
+        else:
+            logger.info(f"【OpenClaw】进度检查通过：{progress_msg}")
+        
+        # 3. 错误日志检查
+        log_ok, log_msg = self._check_error_log()
+        if not log_ok:
+            self._send_alert("错误日志异常", log_msg)
+        else:
+            logger.info(f"【OpenClaw】日志检查通过：{log_msg}")
+        
+        logger.info("【OpenClaw】监控检查执行完成")
+
+    def start(self):
+        """启动监控循环"""
+        logger.info("【OpenClaw】启动监控循环，检查间隔：{}秒".format(self.check_interval))
+        try:
+            while True:
+                self.run_check()
+                time.sleep(self.check_interval)
+        except KeyboardInterrupt:
+            logger.info("【OpenClaw】收到中断信号，监控系统退出")
+        except Exception as e:
+            logger.error(f"【OpenClaw】监控循环异常：{str(e)}", exc_info=True)
+
+if __name__ == "__main__":
+    monitor = OpenClawMonitor()
+    monitor.start()</code></pre>
+                            <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-6">复制代码</button>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h5 class="font-bold text-lg mb-2 text-primary">alert.py 告警推送模块</h5>
+                        <div class="code-block">
+                            <pre><code class="language-python">import requests
+import logging
+from datetime import datetime
+
+logger = logging.getLogger("AlertSender")
+
+class AlertSender:
+    def __init__(self, alert_config):
+        self.config = alert_config
+        self.channels = []
+        self._init_channels()
+
+    def _init_channels(self):
+        """初始化告警渠道"""
+        # 微信推送（Server酱）
+        if self.config.get("serverchan", {}).get("enable", False):
+            self.serverchan_key = self.config["serverchan"].get("send_key")
+            self.channels.append("serverchan")
+            logger.info("告警渠道已启用：微信推送(Server酱)")
+        
+        # 钉钉机器人
+        if self.config.get("dingtalk", {}).get("enable", False):
+            self.dingtalk_webhook = self.config["dingtalk"].get("webhook")
+            self.dingtalk_secret = self.config["dingtalk"].get("secret")
+            self.channels.append("dingtalk")
+            logger.info("告警渠道已启用：钉钉机器人")
+        
+        # 企业微信机器人
+        if self.config.get("wecom", {}).get("enable", False):
+            self.wecom_webhook = self.config["wecom"].get("webhook")
+            self.channels.append("wecom")
+            logger.info("告警渠道已启用：企业微信机器人")
+        
+        logger.info(f"告警渠道初始化完成，共启用{len(self.channels)}个渠道")
+
+    def _send_serverchan(self, title, content):
+        """发送Server酱微信推送"""
+        if not self.serverchan_key:
+            return False
+        try:
+            url = f"https://sctapi.ftqq.com/{self.serverchan_key}.send"
+            data = {
+                "title": title,
+                "desp": f"{content}\n\n告警时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            }
+            resp = requests.post(url, data=data, timeout=10)
+            if resp.status_code == 200 and resp.json().get("code") == 0:
+                logger.info("Server酱微信推送发送成功")
+                return True
+            else:
+                logger.error(f"Server酱推送失败：{resp.text}")
+                return False
+        except Exception as e:
+            logger.error(f"Server酱推送异常：{str(e)}")
+            return False
+
+    def _send_dingtalk(self, title, content):
+        """发送钉钉机器人消息"""
+        if not self.dingtalk_webhook:
+            return False
+        try:
+            # 签名处理（如果配置了secret）
+            timestamp = str(int(datetime.now().timestamp() * 1000))
+            sign = ""
+            if self.dingtalk_secret:
+                import hmac
+                import hashlib
+                import base64
+                secret_enc = self.dingtalk_secret.encode('utf-8')
+                string_to_sign = f"{timestamp}\n{self.dingtalk_secret}"
+                string_to_sign_enc = string_to_sign.encode('utf-8')
+                hmac_code = hmac.new(secret_enc, string_to_sign_enc, digestmod=hashlib.sha256).digest()
+                sign = base64.b64encode(hmac_code).decode('utf-8')
+            
+            url = self.dingtalk_webhook
+            if sign:
+                url += f"&timestamp={timestamp}&sign={sign}"
+            
+            data = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": title,
+                    "text": f"### {title}\n\n{content}\n\n**告警时间**：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                }
+            }
+            resp = requests.post(url, json=data, timeout=10)
+            if resp.status_code == 200 and resp.json().get("errcode") == 0:
+                logger.info("钉钉机器人消息发送成功")
+                return True
+            else:
+                logger.error(f"钉钉推送失败：{resp.text}")
+                return False
+        except Exception as e:
+            logger.error(f"钉钉推送异常：{str(e)}")
+            return False
+
+    def _send_wecom(self, title, content):
+        """发送企业微信机器人消息"""
+        if not self.wecom_webhook:
+            return False
+        try:
+            data = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "content": f"### {title}\n\n{content}\n\n**告警时间**：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                }
+            }
+            resp = requests.post(self.wecom_webhook, json=data, timeout=10)
+            if resp.status_code == 200 and resp.json().get("errcode") == 0:
+                logger.info("企业微信机器人消息发送成功")
+                return True
+            else:
+                logger.error(f"企业微信推送失败：{resp.text}")
+                return False
+        except Exception as e:
+            logger.error(f"企业微信推送异常：{str(e)}")
+            return False
+
+    def send_alert(self, title, content):
+        """发送告警到所有已启用的渠道"""
+        if not self.channels:
+            logger.warning("未启用任何告警渠道，无法发送告警")
+            return False
+        
+        logger.info(f"开始发送告警，标题：{title}")
+        success_count = 0
+        
+        # 发送到各个渠道
+        if "serverchan" in self.channels:
+            if self._send_serverchan(title, content):
+                success_count += 1
+        
+        if "dingtalk" in self.channels:
+            if self._send_dingtalk(title, content):
+                success_count += 1
+        
+        if "wecom" in self.channels:
+            if self._send_wecom(title, content):
+                success_count += 1
+        
+        logger.info(f"告警发送完成，成功渠道数：{success_count}/{len(self.channels)}")
+        return success_count > 0</code></pre>
+                            <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-7">复制代码</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 依赖文件 -->
+            <div class="mb-8">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">5. requirements.txt 依赖文件</h4>
+                    <div class="code-block">
+                        <pre><code class="language-bash"># 核心依赖
+pyyaml>=6.0.1
+psutil>=5.9.8
+requests>=2.31.0
+
+# 浏览器自动化
+playwright>=1.44.0
+
+# 日志与工具
+python-dotenv>=1.0.1</code></pre>
+                        <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-8">复制代码</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 部署指南 -->
+        <section id="deploy" class="mb-16 anchor-offset">
+            <h3 class="text-2xl font-bold text-dark mb-6 border-l-4 border-primary pl-4">六、部署与运行指南</h3>
+            <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                <ol class="space-y-4">
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">1</span>
+                        <div>
+                            <h5 class="font-bold text-dark">环境准备</h5>
+                            <ul class="pl-6 list-disc text-gray-700 mt-1">
+                                <li>Python 3.9+ 环境</li>
+                                <li>Chrome/Chromium 浏览器（用于Playwright自动化）</li>
+                                <li>Windows/MacOS/Linux 系统均可运行</li>
+                            </ul>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">2</span>
+                        <div>
+                            <h5 class="font-bold text-dark">项目初始化</h5>
+                            <div class="code-block mt-2">
+                                <pre><code class="language-bash"># 1. 创建项目目录，按照上面的目录结构创建对应文件
+mkdir -p agent-automation-system/{sub_agents,harness,data/backup,logs,openclaw}
+
+# 2. 安装依赖
+pip install -r requirements.txt
+
+# 3. 安装Playwright浏览器驱动
+playwright install chromium</code></pre>
+                                <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-9">复制代码</button>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">3</span>
+                        <div>
+                            <h5 class="font-bold text-dark">配置文件修改</h5>
+                            <ul class="pl-6 list-disc text-gray-700 mt-1">
+                                <li>修改 <code>data/memory.md</code> 中的账号信息、平台地址等配置</li>
+                                <li>修改 <code>harness/</code> 目录下的规则文件，适配业务场景</li>
+                                <li>修改 <code>openclaw/config.yaml</code> 监控配置，配置告警渠道的密钥</li>
+                                <li>初始化 <code>data/progress.md</code> 进度文件，配置任务步骤</li>
+                            </ul>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">4</span>
+                        <div>
+                            <h5 class="font-bold text-dark">启动运行</h5>
+                            <div class="code-block mt-2">
+                                <pre><code class="language-bash"># 1. 先启动OpenClaw监控系统（推荐后台运行）
+cd openclaw
+nohup python3 monitor.py > ../logs/openclaw.log 2>&1 &
+
+# 2. 启动主Agent调度系统
+cd ..
+python3 main_agent.py</code></pre>
+                                <button class="copy-btn mt-2 px-3 py-1 bg-primary text-white text-sm rounded hover:bg-primary/90 transition-colors" data-target="code-block-10">复制代码</button>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="w-6 h-6 rounded-full bg-primary text-white inline-flex items-center justify-center mr-3 text-sm flex-shrink-0 mt-0.5">5</span>
+                        <div>
+                            <h5 class="font-bold text-dark">运行验证</h5>
+                            <ul class="pl-6 list-disc text-gray-700 mt-1">
+                                <li>查看 <code>logs/</code> 目录下的日志文件，确认系统正常运行</li>
+                                <li>查看 <code>data/progress.md</code> 文件，确认进度正常更新</li>
+                                <li>测试告警渠道，确认异常时能正常收到手机推送</li>
+                            </ul>
+                        </div>
+                    </li>
+                </ol>
+            </div>
+        </section>
+
+        <!-- 风险与扩展 -->
+        <section id="risk" class="mb-16 anchor-offset">
+            <h3 class="text-2xl font-bold text-dark mb-6 border-l-4 border-primary pl-4">七、风险兜底与进阶扩展</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">风险兜底方案</h4>
+                    <ul class="space-y-3 text-gray-700">
+                        <li class="flex items-start">
+                            <span class="text-red-500 mr-2">●</span>
+                            <span><strong>文件锁与并发冲突</strong>：采用文件级排他锁，主Agent写入时禁止其他写入操作，避免并发冲突；所有写入采用临时文件替换机制，避免文件损坏。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-red-500 mr-2">●</span>
+                            <span><strong>主Agent崩溃兜底</strong>：OpenClaw监控检测到主进程崩溃时，可配置自动重启主Agent，自动从progress.md断点继续执行，无需人工干预。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-red-500 mr-2">●</span>
+                            <span><strong>任务回滚机制</strong>：每次进度更新自动备份历史版本，出现异常时可一键回滚到任意历史进度，重新执行。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-red-500 mr-2">●</span>
+                            <span><strong>风控熔断机制</strong>：配置连续失败阈值，达到阈值时自动暂停任务，推送告警，避免频繁操作触发平台风控。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-red-500 mr-2">●</span>
+                            <span><strong>紧急终止机制</strong>：OpenClaw监控可配置紧急终止规则，出现严重异常时自动终止所有相关进程，避免风险扩大。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                    <h4 class="text-xl font-bold text-dark mb-4">进阶扩展方向</h4>
+                    <ul class="space-y-3 text-gray-700">
+                        <li class="flex items-start">
+                            <span class="text-green-500 mr-2">●</span>
+                            <span><strong>分布式部署</strong>：将SubAgent部署到多台服务器/容器，实现分布式并行执行，主Agent通过消息队列分发任务，支持大规模任务处理。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-green-500 mr-2">●</span>
+                            <span><strong>可视化管理面板</strong>：开发Web管理面板，实时展示任务进度、运行日志、监控数据，支持远程启停任务、修改配置、手动干预。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-green-500 mr-2">●</span>
+                            <span><strong>LLM深度集成</strong>：主Agent接入大模型，实现任务自动拆解、异常自动排查、规则动态调整，实现真正的智能Agent调度。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-green-500 mr-2">●</span>
+                            <span><strong>多租户支持</strong>：扩展为多租户系统，支持多个用户、多个任务同时运行，资源隔离，权限管控。</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="text-green-500 mr-2">●</span>
+                            <span><strong>Docker容器化部署</strong>：打包为Docker镜像，一键部署运行，环境隔离，避免依赖冲突，支持K8s编排。</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-8">
+        <div class="container mx-auto px-4 max-w-6xl">
+            <div class="text-center">
+                <h3 class="text-xl font-bold mb-2">分层Agent自动化调度系统实现方案</h3>
+                <p class="text-gray-400 mb-4">主从架构 + 无状态执行 + 文件持久化 + 独立监控 全闭环自动化解决方案</p>
+                <p class="text-gray-500 text-sm">© 2024 本方案基于用户需求设计，可自由修改与扩展</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JS脚本 -->
+    <script>
+        // 代码高亮初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            hljs.highlightAll();
+            
+            // 移动端菜单切换
+            const menuBtn = document.getElementById('menuBtn');
+            const mobileMenu = document.getElementById('mobileMenu');
+            menuBtn.addEventListener('click', () => {
+                mobileMenu.classList.toggle('hidden');
+            });
+
+            // 代码块复制功能
+            const copyBtns = document.querySelectorAll('.copy-btn');
+            copyBtns.forEach((btn, index) => {
+                btn.dataset.target = `code-block-${index}`;
+                const pre = btn.previousElementSibling;
+                if (pre) pre.id = `code-block-${index}`;
+                
+                btn.addEventListener('click', () => {
+                    const targetId = btn.dataset.target;
+                    const codeElement = document.getElementById(targetId);
+                    const code = codeElement.textContent;
+                    
+                    navigator.clipboard.writeText(code).then(() => {
+                        const originalText = btn.textContent;
+                        btn.textContent = '复制成功';
+                        btn.classList.remove('bg-primary');
+                        btn.classList.add('bg-green-600');
+                        
+                        setTimeout(() => {
+                            btn.textContent = originalText;
+                            btn.classList.remove('bg-green-600');
+                            btn.classList.add('bg-primary');
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('复制失败', err);
+                        btn.textContent = '复制失败';
+                        btn.classList.remove('bg-primary');
+                        btn.classList.add('bg-red-600');
+                        
+                        setTimeout(() => {
+                            btn.textContent = '复制代码';
+                            btn.classList.remove('bg-red-600');
+                            btn.classList.add('bg-primary');
+                        }, 2000);
+                    });
+                });
+            });
+
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 80,
+                            behavior: 'smooth'
+                        });
+                        // 关闭移动端菜单
+                        mobileMenu.classList.add('hidden');
+                    }
+                });
+            });
+
+            // 滚动导航栏效果
+            window.addEventListener('scroll', () => {
+                const header = document.querySelector('header');
+                if (window.scrollY > 50) {
+                    header.classList.add('bg-dark/95', 'backdrop-blur-sm');
+                    header.classList.remove('bg-dark');
+                } else {
+                    header.classList.remove('bg-dark/95', 'backdrop-blur-sm');
+                    header.classList.add('bg-dark');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
