@@ -15,3 +15,12 @@
 .role-stats { color: #94a3b8; }
 .panel-error { color: #ef4444; padding: 1rem 0; }
 .panel-loading { color: #64748b; padding: 1rem 0; }
+
+@media (max-width: 768px) {
+  .agent-table { font-size: 0.75rem; }
+  .agent-table th, .agent-table td { padding: 0.35rem 0.4rem; }
+}
+@media (max-width: 480px) {
+  .agent-panel { overflow-x: auto; }
+  .agent-table { min-width: 500px; }
+}

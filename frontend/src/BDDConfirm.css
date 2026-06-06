@@ -1,0 +1,28 @@
+.bdd-panel { padding: 1rem; background: #0f172a; border: 1px solid #334155; border-radius: 6px; margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.bdd-header { display: flex; justify-content: space-between; align-items: center; }
+.bdd-header h3 { font-size: 0.95rem; }
+.bdd-close { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1.1rem; }
+.bdd-status-row { font-size: 0.85rem; }
+.bdd-badge { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 3px; color: #fff; margin-left: 0.3rem; }
+.bdd-badge.pending { background: #f59e0b; }
+.bdd-badge.draft { background: #3b82f6; }
+.bdd-badge.confirmed { background: #22c55e; }
+.bdd-badge.rejected { background: #ef4444; }
+.bdd-fields { display: flex; flex-direction: column; gap: 0.35rem; }
+.bdd-fields label { font-size: 0.75rem; color: #94a3b8; }
+.bdd-fields textarea { padding: 0.4rem; border: 1px solid #334155; border-radius: 4px; background: #1e293b; color: #e2e8f0; font-size: 0.8rem; resize: vertical; }
+.bdd-fields textarea:disabled { opacity: 0.5; }
+.bdd-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.bdd-btn { padding: 0.35rem 0.8rem; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+.bdd-btn.confirm { background: #22c55e; color: #fff; }
+.bdd-btn.feedback { background: #f59e0b; color: #000; }
+.bdd-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.bdd-feedback-input { flex: 1; min-width: 200px; padding: 0.35rem 0.5rem; border: 1px solid #334155; border-radius: 4px; background: #1e293b; color: #e2e8f0; font-size: 0.8rem; }
+.bdd-msg { font-size: 0.8rem; color: #60a5fa; }
+.bdd-confirmed-msg { font-size: 0.8rem; color: #22c55e; }
+.bdd-loading { color: #64748b; font-size: 0.85rem; }
+
+@media (max-width: 480px) {
+  .bdd-feedback-input { min-width: 120px; }
+  .bdd-panel { padding: 0.6rem; }
+}

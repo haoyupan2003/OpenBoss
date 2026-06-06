@@ -1,0 +1,23 @@
+.req-form { padding: 1rem 0; }
+.req-form h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }
+.rf-inputs { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+.rf-title, .rf-need { padding: 0.5rem; border: 1px solid #334155; border-radius: 4px; background: #1e293b; color: #e2e8f0; font-size: 0.85rem; }
+.rf-need { resize: vertical; min-height: 80px; }
+.rf-submit { align-self: flex-start; padding: 0.5rem 1.25rem; background: #2563eb; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
+.rf-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+.rf-error { color: #ef4444; font-size: 0.85rem; margin-bottom: 0.5rem; }
+.rf-result { font-size: 0.85rem; margin-bottom: 1rem; padding: 0.5rem; background: #0f172a; border-radius: 4px; }
+.rf-result code { background: #334155; padding: 0.1rem 0.3rem; border-radius: 2px; }
+.rf-list-h { font-size: 0.95rem; margin: 1rem 0 0.5rem; }
+.rf-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.rf-table th { text-align: left; padding: 0.4rem 0.75rem; border-bottom: 1px solid #334155; color: #94a3b8; font-weight: 500; }
+.rf-table td { padding: 0.4rem 0.75rem; border-bottom: 1px solid #1e293b; }
+tr.rf-selected td { background: #1e3a5f; }
+.rf-id { font-family: monospace; font-size: 0.8rem; color: #94a3b8; }
+.rf-status { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 3px; color: #fff; }
+.rf-empty { color: #475569; padding: 1rem !important; text-align: center; }
+
+@media (max-width: 480px) {
+  .req-form { overflow-x: auto; }
+  .rf-table { min-width: 360px; font-size: 0.75rem; }
+}

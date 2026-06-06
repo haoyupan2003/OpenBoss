@@ -10,7 +10,11 @@ export default defineConfig({
       '/health': 'http://127.0.0.1:8080',
       '/docs': 'http://127.0.0.1:8080',
       '/openapi.json': 'http://127.0.0.1:8080',
-      '/ws': { target: 'ws://127.0.0.1:8080', ws: true },
     },
+  },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
   },
 })

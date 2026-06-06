@@ -1,0 +1,17 @@
+.alerts-panel { padding: 1rem 0; }
+.alerts-panel h2 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+.ap-filters { display: flex; gap: 0.25rem; margin-bottom: 0.75rem; }
+.ap-filters button { padding: 0.25rem 0.6rem; border: 1px solid #334155; background: #1e293b; color: #94a3b8; border-radius: 4px; cursor: pointer; font-size: 0.75rem; }
+.ap-filters button.active { background: #2563eb; color: #fff; border-color: #2563eb; }
+.ap-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.ap-table th { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #334155; color: #94a3b8; font-weight: 500; }
+.ap-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #1e293b; }
+.ap-level { font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 3px; color: #fff; text-transform: uppercase; }
+.ap-time { font-family: monospace; font-size: 0.8rem; color: #94a3b8; }
+.ap-empty { color: #475569; padding: 1.5rem !important; text-align: center; }
+.ap-loading { color: #64748b; padding: 1rem 0; }
+
+@media (max-width: 480px) {
+  .alerts-panel { overflow-x: auto; }
+  .ap-table { min-width: 420px; font-size: 0.75rem; }
+}

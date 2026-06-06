@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { apiUrl } from './api'
 import './TaskList.css'
 
 interface TaskInfo {
@@ -26,7 +27,9 @@ const STATUS_COLORS: Record<string, string> = {
   blocked: '#f59e0b', pending: '#6b7280',
 }
 
-export default function TaskList() {
+interface Props { wsRefresh?: string | null }
+
+export default function TaskList({ wsRefresh }: Props) {
   const [data, setData] = useState<TasksResponse | null>(null)
   const [filter, setFilter] = useState<string>('ALL')
   const [error, setError] = useState<string | null>(null)
@@ -34,12 +37,12 @@ export default function TaskList() {
   useEffect(() => {
     const params = filter !== 'ALL' ? `?status=${filter}` : ''
     let cancelled = false
-    fetch(`/api/tasks${params}`)
+    fetch(apiUrl(`/api/tasks${params}`))
       .then(r => r.json())
       .then(d => { if (!cancelled) { setData(d); setError(null) } })
       .catch(e => { if (!cancelled) setError(e.message) })
     return () => { cancelled = true }
-  }, [filter])
+  }, [filter, wsRefresh])
 
   if (error) return <div className="tl-error">Failed to load tasks: {error}</div>
   if (!data) return <div className="tl-loading">Loading tasks...</div>

@@ -16,3 +16,13 @@
 .tl-empty { color: #475569; padding: 1.5rem !important; text-align: center; }
 .tl-error { color: #ef4444; padding: 1rem 0; }
 .tl-loading { color: #64748b; padding: 1rem 0; }
+
+@media (max-width: 768px) {
+  .tl-filters { flex-wrap: wrap; }
+  .tl-table { font-size: 0.75rem; }
+  .tl-table th, .tl-table td { padding: 0.35rem 0.4rem; }
+}
+@media (max-width: 480px) {
+  .task-list { overflow-x: auto; }
+  .tl-table { min-width: 480px; }
+}

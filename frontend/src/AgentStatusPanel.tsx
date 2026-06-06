@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import TerminalViewer from './TerminalViewer'
+import { apiUrl } from './api'
 import './AgentStatusPanel.css'
 
 interface AgentInfo {
@@ -34,7 +36,9 @@ function formatDuration(started: string | null, finished: string | null): string
   return `${Math.floor(sec / 60)}m ${sec % 60}s`
 }
 
-export default function AgentStatusPanel() {
+interface Props { wsRefresh?: string | null }
+
+export default function AgentStatusPanel({ wsRefresh }: Props) {
   const [data, setData] = useState<AgentsResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -42,7 +46,7 @@ export default function AgentStatusPanel() {
     let cancelled = false
 
     const fetchAgents = () => {
-      fetch('/api/agents')
+      fetch(apiUrl('/api/agents'))
         .then(r => r.json())
         .then(d => { if (!cancelled) { setData(d); setError(null) } })
         .catch(e => { if (!cancelled) setError(e.message) })
@@ -51,7 +55,7 @@ export default function AgentStatusPanel() {
     fetchAgents()
     const timer = setInterval(fetchAgents, 5000)
     return () => { cancelled = true; clearInterval(timer) }
-  }, [])
+  }, [wsRefresh])
 
   if (error) return <div className="panel-error">Failed to load agents: {error}</div>
   if (!data) return <div className="panel-loading">Loading agents...</div>
@@ -70,6 +74,7 @@ export default function AgentStatusPanel() {
             <th>Status</th>
             <th>Duration</th>
             <th>Git</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -84,10 +89,11 @@ export default function AgentStatusPanel() {
               </td>
               <td>{formatDuration(a.started, a.finished)}</td>
               <td className="git-sha">{a.git_sha?.slice(0, 7) || '-'}</td>
+              <td><TerminalViewer agentId={a.task_id} /></td>
             </tr>
           ))}
           {agents.length === 0 && (
-            <tr><td colSpan={5} className="empty">No agents yet.</td></tr>
+            <tr><td colSpan={6} className="empty">No agents yet.</td></tr>
           )}
         </tbody>
       </table>
